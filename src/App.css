@@ -582,6 +582,10 @@ body {
   border-bottom: none;
 }
 
+.history-table tbody tr {
+  cursor: context-menu;
+}
+
 .history-items-cell {
   min-width: 130px;
 }
@@ -606,6 +610,33 @@ body {
   display: inline-grid;
   place-items: center;
   line-height: 1;
+}
+
+.history-context-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 150px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  padding: 0.28rem;
+  display: grid;
+}
+
+.history-context-menu button {
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  padding: 0.46rem 0.58rem;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.history-context-menu button:hover {
+  background: var(--surface-muted);
 }
 
 .history-detail-row td {
@@ -901,6 +932,11 @@ input[readonly] {
   overflow: hidden;
   transform-origin: top right;
   animation: toast-in 220ms ease;
+}
+
+.toast-message {
+  flex: 1;
+  text-align: start;
 }
 
 .toast.is-closing {

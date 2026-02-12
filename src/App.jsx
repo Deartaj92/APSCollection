@@ -75,6 +75,11 @@ function getStoredSessionUser() {
   }
 }
 
+function getMessageDirection(message) {
+  const text = String(message || "");
+  return /[\u0600-\u06FF]/.test(text) ? "rtl" : "ltr";
+}
+
 function getNextInvoiceNumber(records) {
   const maxNumeric = records.reduce((max, record) => {
     const text = String(record.invoiceNo || "");
@@ -622,6 +627,8 @@ export default function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [printConfirmRecord, setPrintConfirmRecord] = useState(null);
+  const [editingPaymentId, setEditingPaymentId] = useState(null);
+  const [historyContextMenu, setHistoryContextMenu] = useState(null);
 
   const studentNameRef = useRef(null);
   const firstItemNameRef = useRef(null);
@@ -660,6 +667,20 @@ export default function App() {
       printConfirmButtonRef.current?.focus();
     }, 0);
   }, [printConfirmRecord]);
+
+  useEffect(() => {
+    if (!historyContextMenu) {
+      return;
+    }
+
+    const closeMenu = () => setHistoryContextMenu(null);
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [historyContextMenu]);
 
   useEffect(() => {
     if (!supabase || !isAuthenticated) {
@@ -856,6 +877,7 @@ export default function App() {
     setStudentName("");
     setFatherName("");
     setStudentClass("");
+    setEditingPaymentId(null);
     setInvoiceNo(getNextInvoiceNumber(paymentHistory));
     setFeeItems(createInitialFeeItems());
     setAmountReceived("0");
@@ -890,7 +912,7 @@ export default function App() {
     const finalInvoiceNo = invoiceNo.trim() || getNextInvoiceNumber(paymentHistory);
 
     const record = {
-      id: crypto.randomUUID(),
+      id: editingPaymentId || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       date,
       studentName: studentName.trim(),
@@ -904,29 +926,56 @@ export default function App() {
     };
 
     setIsSavingPayment(true);
-    let updatedHistory = [record, ...paymentHistory];
+    let updatedHistory = editingPaymentId
+      ? paymentHistory.map((item) => (item.id === editingPaymentId ? record : item))
+      : [record, ...paymentHistory];
 
     if (supabase) {
-      const { data: paymentRow, error: paymentError } = await supabase
-        .from("fee_payments")
-        .insert({
-          invoice_no: record.invoiceNo,
-          payment_date: record.date,
-          student_name: record.studentName,
-          father_name: record.fatherName,
-          class_name: record.className,
-          total_amount: record.totalAmount,
-          amount_received: record.amountReceived,
-        })
-        .select(
-          "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
-        )
-        .single();
+      const payload = {
+        invoice_no: record.invoiceNo,
+        payment_date: record.date,
+        student_name: record.studentName,
+        father_name: record.fatherName,
+        class_name: record.className,
+        total_amount: record.totalAmount,
+        amount_received: record.amountReceived,
+      };
+
+      const paymentQuery = editingPaymentId
+        ? supabase
+            .from("fee_payments")
+            .update(payload)
+            .eq("id", editingPaymentId)
+            .select(
+              "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
+            )
+            .single()
+        : supabase
+            .from("fee_payments")
+            .insert(payload)
+            .select(
+              "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
+            )
+            .single();
+
+      const { data: paymentRow, error: paymentError } = await paymentQuery;
 
       if (paymentError) {
         setIsSavingPayment(false);
-        toast.error("ادائیگی محفوظ نہیں ہو سکی۔");
+        toast.error(editingPaymentId ? "ادائیگی اپڈیٹ نہیں ہو سکی۔" : "ادائیگی محفوظ نہیں ہو سکی۔");
         return;
+      }
+
+      if (editingPaymentId) {
+        const { error: deleteItemsError } = await supabase
+          .from("fee_payment_items")
+          .delete()
+          .eq("payment_id", paymentRow.id);
+        if (deleteItemsError) {
+          setIsSavingPayment(false);
+          toast.error("پرانے آئٹمز حذف نہیں ہو سکے۔");
+          return;
+        }
       }
 
       if (record.feeItems.length > 0) {
@@ -939,38 +988,128 @@ export default function App() {
 
         const { error: itemsError } = await supabase.from("fee_payment_items").insert(itemRows);
         if (itemsError) {
-          await supabase.from("fee_payments").delete().eq("id", paymentRow.id);
+          if (!editingPaymentId) {
+            await supabase.from("fee_payments").delete().eq("id", paymentRow.id);
+          }
           setIsSavingPayment(false);
           toast.error("آئٹمز محفوظ نہیں ہو سکے۔");
           return;
         }
       }
 
-      updatedHistory = [
-        mapDbPaymentToUiRecord({
-          ...paymentRow,
-          fee_payment_items: record.feeItems.map((item, index) => ({
-            item_name: item.item,
-            amount: item.amount,
-            sort_order: index,
-          })),
-        }),
-        ...paymentHistory,
-      ];
+      const mappedRow = mapDbPaymentToUiRecord({
+        ...paymentRow,
+        fee_payment_items: record.feeItems.map((item, index) => ({
+          item_name: item.item,
+          amount: item.amount,
+          sort_order: index,
+        })),
+      });
+
+      updatedHistory = editingPaymentId
+        ? paymentHistory.map((item) => (item.id === editingPaymentId ? mappedRow : item))
+        : [mappedRow, ...paymentHistory];
     }
 
-    const savedRecord = supabase ? updatedHistory[0] : record;
+    const savedRecord =
+      supabase
+        ? updatedHistory.find((item) => item.id === (editingPaymentId || updatedHistory[0]?.id))
+        : record;
 
     setPaymentHistory(updatedHistory);
     setIsSavingPayment(false);
 
-    toast.success("ادائیگی کامیابی سے محفوظ ہو گئی۔");
-    setPrintConfirmRecord(savedRecord);
+    toast.success(editingPaymentId ? "ادائیگی کامیابی سے اپڈیٹ ہو گئی۔" : "ادائیگی کامیابی سے محفوظ ہو گئی۔");
+    if (savedRecord) {
+      setPrintConfirmRecord(savedRecord);
+    }
     handleReset();
     setInvoiceNo(getNextInvoiceNumber(updatedHistory));
     window.setTimeout(() => {
       studentNameRef.current?.focus();
     }, 0);
+  };
+
+  const handleHistoryContextMenu = (event, recordId) => {
+    event.preventDefault();
+    setHistoryContextMenu({
+      recordId,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const handleEditFromHistory = () => {
+    if (!historyContextMenu?.recordId) {
+      return;
+    }
+
+    const record = paymentHistory.find((item) => item.id === historyContextMenu.recordId);
+    if (!record) {
+      setHistoryContextMenu(null);
+      return;
+    }
+
+    setDate(record.date || getTodayDate());
+    setStudentName(record.studentName || "");
+    setFatherName(record.fatherName || "");
+    setStudentClass(record.className || "");
+    setInvoiceNo(record.invoiceNo || getNextInvoiceNumber(paymentHistory));
+    setFeeItems(
+      (record.feeItems || []).length
+        ? record.feeItems.map((item) => ({
+            id: crypto.randomUUID(),
+            item: item.item || "",
+            amount: String(toWholeNumber(item.amount)),
+          }))
+        : createInitialFeeItems()
+    );
+    setAmountReceived(String(toWholeNumber(record.amountReceived)));
+    setEditingPaymentId(record.id);
+    setHistoryContextMenu(null);
+    setActivePage("collect-fee");
+    window.setTimeout(() => {
+      studentNameRef.current?.focus();
+    }, 0);
+  };
+
+  const handleDeleteFromHistory = async () => {
+    if (!historyContextMenu?.recordId) {
+      return;
+    }
+    const recordId = historyContextMenu.recordId;
+    setHistoryContextMenu(null);
+
+    if (!window.confirm("Delete this payment record?")) {
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase.from("fee_payments").delete().eq("id", recordId);
+      if (error) {
+        toast.error("Record delete نہیں ہو سکا۔");
+        return;
+      }
+    }
+
+    setPaymentHistory((current) => current.filter((item) => item.id !== recordId));
+    setExpandedHistoryId((current) => (current === recordId ? null : current));
+    if (editingPaymentId === recordId) {
+      handleReset();
+    }
+    toast.success("Record deleted.");
+  };
+
+  const handlePrintFromHistoryContext = () => {
+    if (!historyContextMenu?.recordId) {
+      return;
+    }
+    const record = paymentHistory.find((item) => item.id === historyContextMenu.recordId);
+    setHistoryContextMenu(null);
+    if (!record) {
+      return;
+    }
+    handlePrintInvoice(record);
   };
 
   const handleLoginSubmit = async (event) => {
@@ -1176,7 +1315,9 @@ export default function App() {
               style={{ "--toast-duration": `${item.duration || 3200}ms` }}
               key={item.id}
             >
-              <span>{item.message}</span>
+              <span className="toast-message" dir={getMessageDirection(item.message)}>
+                {item.message}
+              </span>
               <button
                 type="button"
                 className="toast-close"
@@ -1444,7 +1585,7 @@ export default function App() {
 
                     return (
                       <Fragment key={record.id}>
-                        <tr>
+                        <tr onContextMenu={(event) => handleHistoryContextMenu(event, record.id)}>
                           <td>{record.invoiceNo || "-"}</td>
                           <td>
                             <bdi dir="ltr">{formatDateDDMMYYYY(record.date)}</bdi>
@@ -1512,11 +1653,11 @@ export default function App() {
       ) : (
         <section className="card">
           <form className="payment-form" onSubmit={handleSubmit}>
-            <header className="form-header">
-              <div className="form-title-row">
-                <h1>طلبہ فیس ادائیگی</h1>
-                <span className="invoice-chip">Invoice: {invoiceNo}</span>
-              </div>
+                <header className="form-header">
+                  <div className="form-title-row">
+                    <h1>{editingPaymentId ? "طلبہ فیس ادائیگی (ترمیم)" : "طلبہ فیس ادائیگی"}</h1>
+                    <span className="invoice-chip">Invoice: {invoiceNo}</span>
+                  </div>
               <div className="grid grid-4">
                 <label className="field">
                   <span>طالب علم کا نام</span>
@@ -1647,12 +1788,12 @@ export default function App() {
                 </label>
               </section>
 
-              <div className="actions">
-                <button type="submit" className="btn btn-primary" disabled={isSavingPayment}>
-                  {isSavingPayment ? "Saving..." : "Save"}
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={handleReset}>
-                  Reset
+                  <div className="actions">
+                    <button type="submit" className="btn btn-primary" disabled={isSavingPayment}>
+                      {isSavingPayment ? "Saving..." : editingPaymentId ? "Update" : "Save"}
+                    </button>
+                    <button type="button" className="btn btn-ghost" onClick={handleReset}>
+                      Reset
                 </button>
               </div>
             </footer>
@@ -1668,7 +1809,9 @@ export default function App() {
               style={{ "--toast-duration": `${item.duration || 3200}ms` }}
               key={item.id}
             >
-              <span>{item.message}</span>
+              <span className="toast-message" dir={getMessageDirection(item.message)}>
+                {item.message}
+              </span>
               <button
                 type="button"
                 className="toast-close"
@@ -1680,6 +1823,23 @@ export default function App() {
               <div className="toast-progress" aria-hidden="true" />
             </div>
           ))}
+        </div>
+      )}
+
+      {historyContextMenu && activePage === "history" && (
+        <div
+          className="history-context-menu"
+          style={{ top: `${historyContextMenu.y}px`, left: `${historyContextMenu.x}px` }}
+        >
+          <button type="button" onClick={handlePrintFromHistoryContext}>
+            Print
+          </button>
+          <button type="button" onClick={handleEditFromHistory}>
+            Edit
+          </button>
+          <button type="button" onClick={handleDeleteFromHistory}>
+            Delete
+          </button>
         </div>
       )}
 
