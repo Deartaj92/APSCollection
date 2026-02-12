@@ -1340,7 +1340,7 @@ export default function App() {
         <div className="header-actions">
           <button
             type="button"
-            className="theme-toggle header-icon-btn"
+            className="theme-toggle header-icon-btn theme-btn"
             onClick={() => setIsDarkMode((prev) => !prev)}
             aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
             title={isDarkMode ? "Light mode" : "Dark mode"}
@@ -1358,7 +1358,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="theme-toggle header-icon-btn"
+            className="theme-toggle header-icon-btn logout-btn"
             onClick={handleLogout}
             aria-label="Logout"
             title="Logout"
