@@ -90,6 +90,10 @@ body {
 
 .header-actions {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  direction: ltr;
 }
 
 .app-title-wrap {
@@ -149,6 +153,21 @@ body {
   font: inherit;
   font-weight: 500;
   cursor: pointer;
+}
+
+.header-icon-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.header-icon-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .card {
@@ -586,6 +605,14 @@ body {
   cursor: context-menu;
 }
 
+.history-table tbody tr:hover td {
+  background: rgba(3, 105, 161, 0.08);
+}
+
+.theme-dark .history-table tbody tr:hover td {
+  background: rgba(76, 194, 255, 0.12);
+}
+
 .history-items-cell {
   min-width: 130px;
 }
@@ -622,6 +649,7 @@ body {
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
   padding: 0.28rem;
   display: grid;
+  direction: ltr;
 }
 
 .history-context-menu button {
@@ -633,10 +661,28 @@ body {
   border-radius: 8px;
   font: inherit;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.62rem;
 }
 
 .history-context-menu button:hover {
   background: var(--surface-muted);
+}
+
+.menu-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--brand);
+  flex: 0 0 16px;
+}
+
+.menu-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .history-detail-row td {

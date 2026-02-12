@@ -1340,11 +1340,34 @@ export default function App() {
         <div className="header-actions">
           <button
             type="button"
-            className="theme-toggle"
+            className="theme-toggle header-icon-btn"
             onClick={() => setIsDarkMode((prev) => !prev)}
-            aria-label="Toggle dark mode"
+            aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDarkMode ? "Light mode" : "Dark mode"}
           >
-            {isDarkMode ? "Light Mode" : "Dark Mode"}
+            {isDarkMode ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className="theme-toggle header-icon-btn"
+            onClick={handleLogout}
+            aria-label="Logout"
+            title="Logout"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
           </button>
         </div>
         <div className="app-title-wrap">
@@ -1371,9 +1394,6 @@ export default function App() {
             onClick={() => setActivePage("history")}
           >
             History
-          </button>
-          <button type="button" className="nav-link" onClick={handleLogout}>
-            Logout
           </button>
         </nav>
       </header>
@@ -1575,7 +1595,6 @@ export default function App() {
                     <th>کل رقم</th>
                     <th>وصول</th>
                     <th>بقایا</th>
-                    <th>پرنٹ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1610,21 +1629,10 @@ export default function App() {
                           <td>{record.totalAmount}</td>
                           <td>{record.amountReceived}</td>
                           <td>{record.remainingAmount}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-ghost history-print-btn"
-                              onClick={() => handlePrintInvoice(record)}
-                              title="Print invoice"
-                              aria-label="Print invoice"
-                            >
-                              <span aria-hidden="true">🖨</span>
-                            </button>
-                          </td>
                         </tr>
                         {isExpanded && (
                           <tr className="history-detail-row">
-                            <td colSpan={10}>
+                            <td colSpan={9}>
                               {itemCount ? (
                                 <div className="history-item-chips">
                                   {record.feeItems.map((item, index) => (
@@ -1832,13 +1840,34 @@ export default function App() {
           style={{ top: `${historyContextMenu.y}px`, left: `${historyContextMenu.x}px` }}
         >
           <button type="button" onClick={handlePrintFromHistoryContext}>
-            Print
+            <span className="menu-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9V2h12v7" />
+                <rect x="6" y="14" width="12" height="8" rx="1" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v5a2 2 0 0 1-2 2h-2" />
+              </svg>
+            </span>
+            <span>Print</span>
           </button>
           <button type="button" onClick={handleEditFromHistory}>
-            Edit
+            <span className="menu-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 20h9" />
+                <path d="m16.5 3.5 4 4L8 20l-5 1 1-5Z" />
+              </svg>
+            </span>
+            <span>Edit</span>
           </button>
           <button type="button" onClick={handleDeleteFromHistory}>
-            Delete
+            <span className="menu-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+            </span>
+            <span>Delete</span>
           </button>
         </div>
       )}
