@@ -1,0 +1,222 @@
+:root {
+  --bg-primary: #f1f5f9;
+  --bg-accent: #dbeafe;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --text-main: #0f172a;
+  --text-subtle: #475569;
+  --line: #cbd5e1;
+  --brand: #0369a1;
+  --brand-strong: #075985;
+  --danger: #b91c1c;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Outfit", "Segoe UI", Tahoma, sans-serif;
+  color: var(--text-main);
+  background: radial-gradient(circle at 10% 10%, var(--bg-accent), transparent 40%),
+    linear-gradient(150deg, #f8fafc 0%, var(--bg-primary) 45%, #e2e8f0 100%);
+}
+
+.app-shell {
+  width: min(1040px, 92vw);
+  margin: 2rem auto;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+  padding: 1.25rem;
+}
+
+.card-header h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.8vw, 2rem);
+}
+
+.card-header p {
+  margin: 0.3rem 0 1.1rem;
+  color: var(--text-subtle);
+}
+
+.payment-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field span {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.62rem 0.7rem;
+  font: inherit;
+  background: #fff;
+}
+
+input:focus {
+  outline: 3px solid rgba(3, 105, 161, 0.2);
+  border-color: var(--brand);
+}
+
+input[readonly] {
+  background: var(--surface-muted);
+  color: #334155;
+}
+
+.fee-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+  background: var(--surface-muted);
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.section-title-row h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.fee-items {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.fee-item {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.item-actions {
+  display: flex;
+}
+
+.btn {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.58rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--brand-strong);
+}
+
+.btn-secondary {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.btn-ghost {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.btn-danger {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.preview {
+  margin-top: 1rem;
+  border: 1px dashed #94a3b8;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  padding: 0.7rem;
+}
+
+.preview h3 {
+  margin-top: 0;
+  margin-bottom: 0.45rem;
+  font-size: 1rem;
+}
+
+.preview pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    margin: 1rem auto;
+  }
+
+  .grid-2,
+  .grid-3,
+  .fee-item {
+    grid-template-columns: 1fr;
+  }
+
+  .section-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

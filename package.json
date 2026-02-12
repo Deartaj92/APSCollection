@@ -1,0 +1,20 @@
+{
+  "name": "payments-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "parcel index.html --open",
+    "build": "parcel build index.html",
+    "git:sync": "node scripts/git-sync.js",
+    "git:push": "node scripts/git-sync.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "buffer": "^6.0.3",
+    "parcel": "^2.13.3"
+  }
+}
