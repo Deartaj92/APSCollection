@@ -626,6 +626,7 @@ export default function App() {
   const studentNameRef = useRef(null);
   const firstItemNameRef = useRef(null);
   const printConfirmButtonRef = useRef(null);
+  const loginFormRef = useRef(null);
   const { toasts, toast } = useToast();
 
   useEffect(() => {
@@ -1027,6 +1028,13 @@ export default function App() {
     toast.info("Logged out.");
   };
 
+  const handleLoginKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loginFormRef.current?.requestSubmit();
+    }
+  };
+
   const confirmPrintAfterSave = () => {
     const restoreNameFocus = () => {
       window.setTimeout(() => {
@@ -1128,7 +1136,12 @@ export default function App() {
             <h1>Fee Collection Management</h1>
             <p>Sign in to continue.</p>
           </div>
-          <form className="login-form" onSubmit={handleLoginSubmit}>
+          <form
+            ref={loginFormRef}
+            className="login-form"
+            onSubmit={handleLoginSubmit}
+            onKeyDown={handleLoginKeyDown}
+          >
             <label className="field">
               <span>Username</span>
               <input
