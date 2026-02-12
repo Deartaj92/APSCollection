@@ -59,6 +59,22 @@ function sanitizeWholeInput(value) {
   return String(Math.max(Math.round(parsed), 0));
 }
 
+function getStoredSessionUser() {
+  try {
+    const raw = localStorage.getItem("aps_session_user");
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.username) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function getNextInvoiceNumber(records) {
   const maxNumeric = records.reduce((max, record) => {
     const text = String(record.invoiceNo || "");
@@ -583,6 +599,11 @@ function getHistoryPdfHtml(records) {
   `;
 }
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(getStoredSessionUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredSessionUser()));
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activePage, setActivePage] = useState("home");
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
   const [date, setDate] = useState(getTodayDate);
@@ -608,6 +629,16 @@ export default function App() {
   const { toasts, toast } = useToast();
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      localStorage.removeItem("aps_session_user");
+      return;
+    }
+    if (currentUser?.username) {
+      localStorage.setItem("aps_session_user", JSON.stringify(currentUser));
+    }
+  }, [isAuthenticated, currentUser]);
+
+  useEffect(() => {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
@@ -630,7 +661,7 @@ export default function App() {
   }, [printConfirmRecord]);
 
   useEffect(() => {
-    if (!supabase) {
+    if (!supabase || !isAuthenticated) {
       return;
     }
 
@@ -665,7 +696,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [toast]);
+  }, [toast, isAuthenticated]);
 
   const setUrduOnlyValue = (setter, value) => {
     setter(transliterateRomanToUrdu(value));
@@ -941,6 +972,61 @@ export default function App() {
     }, 0);
   };
 
+  const handleLoginSubmit = async (event) => {
+    event.preventDefault();
+    const username = loginUsername.trim();
+    const password = loginPassword;
+
+    if (!username || !password) {
+      toast.error("Username and password are required.");
+      return;
+    }
+
+    setIsLoggingIn(true);
+
+    if (!supabase) {
+      setIsLoggingIn(false);
+      toast.error("Supabase is not configured.");
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("verify_user_login", {
+      p_username: username,
+      p_password: password,
+    });
+
+    if (error) {
+      setIsLoggingIn(false);
+      toast.error("Login failed.");
+      return;
+    }
+
+    const userRow = Array.isArray(data) ? data[0] : data;
+    if (!userRow?.username) {
+      setIsLoggingIn(false);
+      toast.error("Invalid username or password.");
+      return;
+    }
+
+    setCurrentUser({
+      username: userRow.username,
+      fullName: userRow.full_name || userRow.username,
+      role: userRow.role || "user",
+    });
+    setIsAuthenticated(true);
+    setLoginPassword("");
+    setIsLoggingIn(false);
+    toast.success("Login successful.");
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setActivePage("home");
+    setLoginPassword("");
+    toast.info("Logged out.");
+  };
+
   const confirmPrintAfterSave = () => {
     const restoreNameFocus = () => {
       window.setTimeout(() => {
@@ -1034,6 +1120,66 @@ export default function App() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <main className={`app-shell login-shell ${isDarkMode ? "theme-dark" : ""}`}>
+        <section className="card login-card">
+          <div className="login-head">
+            <h1>Fee Collection Management</h1>
+            <p>Sign in to continue.</p>
+          </div>
+          <form className="login-form" onSubmit={handleLoginSubmit}>
+            <label className="field">
+              <span>Username</span>
+              <input
+                type="text"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                autoComplete="username"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <div className="actions">
+              <button type="submit" className="btn btn-primary" disabled={isLoggingIn}>
+                {isLoggingIn ? "Signing in..." : "Login"}
+              </button>
+            </div>
+          </form>
+        </section>
+        <div className="toast-stack" aria-live="polite" aria-atomic="true">
+          {toasts.map((item) => (
+            <div
+              className={`toast toast-${item.type} ${item.isClosing ? "is-closing" : ""}`}
+              style={{ "--toast-duration": `${item.duration || 3200}ms` }}
+              key={item.id}
+            >
+              <span>{item.message}</span>
+              <button
+                type="button"
+                className="toast-close"
+                onClick={() => toast.dismiss(item.id)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <div className="toast-progress" aria-hidden="true" />
+            </div>
+          ))}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={`app-shell ${isDarkMode ? "theme-dark" : ""}`}>
       <header className="app-header">
@@ -1071,6 +1217,9 @@ export default function App() {
             onClick={() => setActivePage("history")}
           >
             History
+          </button>
+          <button type="button" className="nav-link" onClick={handleLogout}>
+            Logout
           </button>
         </nav>
       </header>

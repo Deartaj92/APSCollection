@@ -29,12 +29,14 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
   font-size: 14px;
   line-height: 1.45;
   color: var(--text-main);
   direction: rtl;
   background: #eef2f6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .app-shell {
@@ -158,6 +160,105 @@ body {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  margin: 0;
+  height: auto;
+  min-height: auto;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  direction: ltr;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    var(--surface);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.32);
+}
+
+.login-head h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: var(--text-main);
+}
+
+.login-head p {
+  margin: 0.45rem 0 0;
+  color: var(--text-subtle);
+  font-size: 1rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.login-form .field span,
+.login-form input {
+  text-align: left;
+}
+
+.login-form .field span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.login-form input {
+  border-radius: 12px;
+  padding: 0.72rem 0.78rem;
+}
+
+.login-form .actions {
+  margin-top: 0.25rem;
+}
+
+.login-form .btn {
+  width: 100%;
+  border-radius: 12px;
+  padding: 0.62rem 0.9rem;
+  font-weight: 600;
+}
+
+.login-shell {
+  grid-template-rows: 1fr;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-shell::before,
+.login-shell::after {
+  content: "";
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(56px);
+  opacity: 0.25;
+}
+
+.login-shell::before {
+  top: -180px;
+  left: -130px;
+  background: #2563eb;
+}
+
+.login-shell::after {
+  bottom: -200px;
+  right: -130px;
+  background: #06b6d4;
+}
+
+.login-shell .login-card {
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-card h2 {
