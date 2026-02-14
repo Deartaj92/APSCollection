@@ -503,6 +503,18 @@ body {
   justify-content: flex-start;
 }
 
+.dashboard-inline-filters {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.8fr) minmax(135px, 0.8fr);
+  gap: 0.5rem;
+  align-items: center;
+  direction: ltr;
+}
+
+.dashboard-card .history-head .history-export-btn {
+  margin-left: auto;
+}
+
 .history-head h2 {
   margin: 0;
   font-size: 1.05rem;
@@ -614,7 +626,310 @@ body {
 }
 
 .history-items-cell {
-  min-width: 130px;
+  min-width: 240px;
+  white-space: normal !important;
+  line-height: 1.35;
+}
+
+.history-inline-input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.36rem 0.46rem;
+  height: 30px;
+  text-align: center;
+}
+
+.history-inline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  direction: ltr;
+  white-space: nowrap;
+  min-width: 72px;
+  margin: 0 auto;
+}
+
+.history-inline-actions .btn {
+  min-width: 28px;
+  padding: 0;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.history-actions-cell {
+  min-width: 118px;
+  width: 118px;
+  text-align: center;
+  vertical-align: middle;
+  padding-inline: 0.35rem !important;
+}
+
+.history-actions-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  direction: ltr;
+}
+
+.expenditure-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  direction: ltr;
+  text-align: left;
+}
+
+.expenditure-top-section,
+.expenditure-history-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.expenditure-card .field span,
+.expenditure-card input,
+.expenditure-card select {
+  direction: ltr;
+  text-align: left;
+}
+
+.expenditure-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.expenditure-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.expenditure-history-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.expenditure-history-title h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.expenditure-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.expenditure-head-main h2 {
+  margin: 0;
+}
+
+.expenditure-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  padding: 0.35rem 0.6rem;
+}
+
+.expenditure-total strong {
+  font-size: 1rem;
+}
+
+.expenditure-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(200px, 1.6fr) minmax(120px, 0.8fr) minmax(
+      220px,
+      1.6fr
+    ) auto;
+  gap: 0.5rem;
+  align-items: center;
+  direction: ltr;
+}
+
+.expenditure-save-btn {
+  height: 34px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.expenditure-filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.8fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  direction: ltr;
+}
+
+.expenditure-export-btn {
+  height: 34px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.expenditure-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.expenditure-table-wrap .history-table th,
+.expenditure-table-wrap .history-table td {
+  direction: ltr;
+  text-align: left;
+}
+
+.expenditure-empty {
+  text-align: left;
+}
+
+.theme-dark .expenditure-head-main h2,
+.theme-dark .expenditure-table-wrap .history-table th,
+.theme-dark .expenditure-table-wrap .history-table td {
+  color: #f3f3f3;
+}
+
+.theme-dark .expenditure-head-main .history-count,
+.theme-dark .expenditure-empty {
+  color: #c7c7c7;
+}
+
+.theme-dark .expenditure-total {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.theme-dark .expenditure-top-section,
+.theme-dark .expenditure-history-section {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.theme-dark .expenditure-total span {
+  color: #cbd5e1;
+}
+
+.theme-dark .expenditure-total strong {
+  color: #7dd3fc;
+}
+
+.theme-dark .expenditure-card input::placeholder {
+  color: #9ca3af;
+}
+
+.history-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  direction: ltr;
+  margin: 0;
+}
+
+.history-action-icon-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  line-height: 1;
+}
+
+.history-row-actions .history-action-icon-btn {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  color: var(--text-main);
+}
+
+.history-row-actions .history-action-icon-btn:hover {
+  background: var(--surface);
+}
+
+.history-action-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.history-row-actions .history-action-delete {
+  color: var(--danger);
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.history-row-actions .history-action-delete:hover {
+  background: rgba(185, 28, 28, 0.14);
+  color: var(--danger);
+}
+
+/* Keep action icon buttons optically centered; override generic .btn styles */
+.history-row-actions .history-action-icon-btn,
+.history-inline-actions .history-action-icon-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.history-row-actions .history-action-icon-btn svg,
+.history-inline-actions .history-action-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  display: block;
+  transform: translateX(0);
+}
+
+.history-inline-items-editor {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.history-inline-items-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.history-inline-item-row {
+  display: grid;
+  grid-template-columns: 28px minmax(220px, 2fr) minmax(110px, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.history-inline-item-index {
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.history-inline-item-name {
+  text-align: right;
+}
+
+.history-inline-item-amount {
+  text-align: center;
+}
+
+.history-inline-items-tools {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .history-items-toggle {
@@ -740,6 +1055,12 @@ body {
   margin-bottom: 0.8rem;
 }
 
+.form-title-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .invoice-chip {
   border: 1px solid var(--line);
   background: var(--surface-muted);
@@ -748,6 +1069,25 @@ body {
   padding: 0.2rem 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.print-prompt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--text-main);
+  border-radius: var(--radius-md);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.print-prompt-toggle input {
+  width: auto;
+  margin: 0;
 }
 
 .form-main {
@@ -1107,7 +1447,13 @@ input[readonly] {
   .grid-5,
   .grid-3,
   .fee-item,
-  .history-inline-filters {
+  .history-inline-filters,
+  .dashboard-inline-filters,
+  .expenditure-form {
+    grid-template-columns: 1fr;
+  }
+
+  .expenditure-filters {
     grid-template-columns: 1fr;
   }
 
