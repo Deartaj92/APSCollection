@@ -578,6 +578,12 @@ body {
   padding: 0.35rem 0.75rem;
 }
 
+.history-export-btn.privacy-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .history-table-wrap {
   overflow: auto;
   border: 1px solid var(--line);

@@ -939,6 +939,7 @@ export default function App() {
   const [historyDateTo, setHistoryDateTo] = useState(getTodayDate);
   const [dashboardDateFrom, setDashboardDateFrom] = useState(getFirstDateOfCurrentMonth);
   const [dashboardDateTo, setDashboardDateTo] = useState(getTodayDate);
+  const [isDashboardPrivate, setIsDashboardPrivate] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [printConfirmRecord, setPrintConfirmRecord] = useState(null);
@@ -1871,7 +1872,7 @@ export default function App() {
   };
 
   const handleExportDashboardPdf = () => {
-    const html = getDashboardPdfHtml(dashboardData);
+    const html = getDashboardPdfHtml(dashboardData, isDashboardPrivate);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const exportUrl = URL.createObjectURL(blob);
     const exportWindow = window.open(exportUrl, "_blank", "width=1280,height=900");
@@ -2231,7 +2232,7 @@ export default function App() {
             <div className="history-head-info">
               <h2>Dashboard</h2>
               <span className="history-count">
-                Fee invoices: {dashboardData.invoiceCount} | Expense entries: {dashboardData.expenseCount}
+                Fee invoices: {isDashboardPrivate ? "••••" : dashboardData.invoiceCount} | Expense entries: {isDashboardPrivate ? "••••" : dashboardData.expenseCount}
               </span>
             </div>
             <div className="dashboard-inline-filters">
@@ -2252,6 +2253,27 @@ export default function App() {
                 onChange={(event) => setDashboardDateTo(event.target.value)}
               />
             </div>
+            <button
+              type="button"
+              className={`btn btn-secondary history-export-btn${isDashboardPrivate ? " privacy-active" : ""}`}
+              onClick={() => setIsDashboardPrivate((prev) => !prev)}
+              title={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
+              aria-label={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
+            >
+              {isDashboardPrivate ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+              {isDashboardPrivate ? "Show" : "Hide"}
+            </button>
             <button type="button" className="btn btn-secondary history-export-btn" onClick={handleExportDashboardPdf}>
               Export PDF
             </button>
@@ -2259,42 +2281,44 @@ export default function App() {
 
           {isLoadingHistory || isLoadingExpenditures ? (
             <div className="history-empty">Loading dashboard data...</div>
-          ) : (
+          ) : (() => {
+            const m = (v) => (isDashboardPrivate ? "••••" : v);
+            return (
             <div className="dashboard-layout">
               <div className="dashboard-kpis">
                 <article className="kpi-card">
                   <span>Total Fee Collected</span>
-                  <strong>{dashboardData.totals.collected}</strong>
+                  <strong>{m(dashboardData.totals.collected)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Total Expenditure</span>
-                  <strong>{dashboardData.totals.spent}</strong>
+                  <strong>{m(dashboardData.totals.spent)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Total Invoices / Expenditures</span>
                   <strong>
-                    {dashboardData.invoiceCount} / {dashboardData.expenseCount}
+                    {m(dashboardData.invoiceCount)} / {m(dashboardData.expenseCount)}
                   </strong>
                 </article>
                 <article className="kpi-card">
                   <span>Cash in Hand</span>
-                  <strong>{dashboardData.totals.cashInHand}</strong>
+                  <strong>{m(dashboardData.totals.cashInHand)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Collection This Month</span>
-                  <strong>{dashboardData.monthCollected}</strong>
+                  <strong>{m(dashboardData.monthCollected)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Spent This Month</span>
-                  <strong>{dashboardData.monthSpent}</strong>
+                  <strong>{m(dashboardData.monthSpent)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Collection Today</span>
-                  <strong>{dashboardData.todayCollected}</strong>
+                  <strong>{m(dashboardData.todayCollected)}</strong>
                 </article>
                 <article className="kpi-card">
                   <span>Spent Today</span>
-                  <strong>{dashboardData.todaySpent}</strong>
+                  <strong>{m(dashboardData.todaySpent)}</strong>
                 </article>
               </div>
 
@@ -2322,12 +2346,12 @@ export default function App() {
                         <tbody>
                           {dashboardData.monthlyComparisonSeries.map((row) => (
                             <tr key={row.label}>
-                              <td>{row.label}</td>
-                              <td>{row.income}</td>
-                              <td>{row.expense}</td>
-                              <td>{row.net}</td>
-                              <td>{row.invoices}</td>
-                              <td>{row.expenseEntries}</td>
+                              <td>{m(row.label)}</td>
+                              <td>{m(row.income)}</td>
+                              <td>{m(row.expense)}</td>
+                              <td>{m(row.net)}</td>
+                              <td>{m(row.invoices)}</td>
+                              <td>{m(row.expenseEntries)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2359,12 +2383,12 @@ export default function App() {
                         <tbody>
                           {dashboardData.dailyComparisonSeries.map((row) => (
                             <tr key={row.label}>
-                              <td>{row.label}</td>
-                              <td>{row.income}</td>
-                              <td>{row.expense}</td>
-                              <td>{row.net}</td>
-                              <td>{row.invoices}</td>
-                              <td>{row.expenseEntries}</td>
+                              <td>{m(row.label)}</td>
+                              <td>{m(row.income)}</td>
+                              <td>{m(row.expense)}</td>
+                              <td>{m(row.net)}</td>
+                              <td>{m(row.invoices)}</td>
+                              <td>{m(row.expenseEntries)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2385,9 +2409,9 @@ export default function App() {
                     <div className="dashboard-list">
                       {dashboardData.outstandingRecords.map((record) => (
                         <div className="dashboard-list-row" key={`due-${record.id}`}>
-                          <span>{record.invoiceNo}</span>
-                          <span>{record.studentName || "-"}</span>
-                          <span>{record.remainingAmount}</span>
+                          <span>{m(record.invoiceNo)}</span>
+                          <span>{m(record.studentName || "-")}</span>
+                          <span>{m(record.remainingAmount)}</span>
                         </div>
                       ))}
                     </div>
@@ -2404,9 +2428,9 @@ export default function App() {
                     <div className="dashboard-list">
                       {dashboardData.topExpenditureRecords.map((record) => (
                         <div className="dashboard-list-row" key={`exp-${record.id}`}>
-                          <span>{formatDateDDMMYYYY(record.date)}</span>
-                          <span>{record.title || "-"}</span>
-                          <span>{record.amount}</span>
+                          <span>{m(formatDateDDMMYYYY(record.date))}</span>
+                          <span>{m(record.title || "-")}</span>
+                          <span>{m(record.amount)}</span>
                         </div>
                       ))}
                     </div>
@@ -2414,7 +2438,7 @@ export default function App() {
                 </section>
               </div>
             </div>
-          )}
+          );})()}
         </section>
       ) : activePage === "history" ? (
         <section className="card history-card">
