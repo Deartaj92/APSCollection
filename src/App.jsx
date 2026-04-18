@@ -28,7 +28,53 @@ function formatDateDDMMYYYY(value) {
   if (!year || !month || !day) {
     return value;
   }
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateDDMMYYYY(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText);
+  const month = Number(monthText);
+  const year = Number(yearText);
+
+  if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) {
+    return null;
+  }
+
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${yearText.padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function formatDateInputDraft(value) {
+  const digits = String(value || "")
+    .replaceAll(/\D/g, "")
+    .slice(0, 8);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
 function escapeHtml(value) {
@@ -78,6 +124,72 @@ function getStoredSessionUser() {
 function getMessageDirection(message) {
   const text = String(message || "");
   return /[\u0600-\u06FF]/.test(text) ? "rtl" : "ltr";
+}
+
+function DateInput({
+  value,
+  onChange,
+  className,
+  title,
+  ariaLabel,
+  required = false,
+  disabled = false,
+  placeholder = "dd/mm/yyyy",
+}) {
+  const [draft, setDraft] = useState(value ? formatDateDDMMYYYY(value) : "");
+
+  useEffect(() => {
+    setDraft(value ? formatDateDDMMYYYY(value) : "");
+  }, [value]);
+
+  const handleChange = (event) => {
+    const formattedValue = formatDateInputDraft(event.target.value);
+    setDraft(formattedValue);
+
+    if (!formattedValue) {
+      onChange("");
+      return;
+    }
+
+    const parsedValue = parseDateDDMMYYYY(formattedValue);
+    if (parsedValue) {
+      onChange(parsedValue);
+    }
+  };
+
+  const handleBlur = () => {
+    if (!draft) {
+      setDraft("");
+      return;
+    }
+
+    const parsedValue = parseDateDDMMYYYY(draft);
+    if (parsedValue) {
+      setDraft(formatDateDDMMYYYY(parsedValue));
+      onChange(parsedValue);
+      return;
+    }
+
+    setDraft(value ? formatDateDDMMYYYY(value) : "");
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      className={className}
+      title={title}
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      value={draft}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      required={required}
+      disabled={disabled}
+      dir="ltr"
+    />
+  );
 }
 
 function getNextInvoiceNumber(records) {
@@ -250,7 +362,7 @@ function getInvoicePrintHtml(record) {
   const copyHtml = (copyTitle) => `
     <section class="copy">
       <div class="copy-tag">${copyTitle}</div>
-      <h1 class="school">الحرم پبلک سکول اینڈ اقرا اکیڈمی</h1>
+      <h1 class="school">الحرم پبلک سکول اینڈ اقراء اکیڈمی</h1>
       <p class="address">مسلم سٹی روڈ بالو، ضلع نوشہرہ - <bdi class="num-ltr">0315-9498390</bdi></p>
 
       <div class="meta">
@@ -358,7 +470,18 @@ function getInvoicePrintHtml(record) {
           }
           .meta span:first-child { text-align: right; }
           .meta span:last-child { text-align: left; }
-          .meta-title { text-align: center; font-weight: 700; }
+          .meta-title {
+            text-align: center;
+            font-weight: 900;
+            font-size: 26px;
+            letter-spacing: 0.02em;
+            color: #000;
+            background: #f3f3f3;
+            border: 2px solid #111;
+            border-radius: 999px;
+            padding: 4px 16px;
+            line-height: 1.15;
+          }
           .date-ltr, .num-ltr { direction: ltr; unicode-bidi: isolate; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #111; padding: 6px 8px; text-align: center; font-size: 24px; line-height: 1.25; }
@@ -410,6 +533,11 @@ function getInvoicePrintHtml(record) {
               font-size: 12px;
               padding: 4px 0;
               margin-bottom: 6px;
+            }
+            .meta-title {
+              font-size: 16px;
+              padding: 2px 10px;
+              border-width: 1.5px;
             }
             th, td {
               font-size: 12px;
@@ -2236,21 +2364,19 @@ export default function App() {
               </span>
             </div>
             <div className="dashboard-inline-filters">
-              <input
+              <DateInput
                 className="mini-filter date-filter"
-                type="date"
                 title="From Date"
                 aria-label="Dashboard from date"
                 value={dashboardDateFrom}
-                onChange={(event) => setDashboardDateFrom(event.target.value)}
+                onChange={setDashboardDateFrom}
               />
-              <input
+              <DateInput
                 className="mini-filter date-filter"
-                type="date"
                 title="To Date"
                 aria-label="Dashboard to date"
                 value={dashboardDateTo}
-                onChange={(event) => setDashboardDateTo(event.target.value)}
+                onChange={setDashboardDateTo}
               />
             </div>
             <button
@@ -2467,22 +2593,20 @@ export default function App() {
                 ))}
               </select>
 
-              <input
+              <DateInput
                 className="mini-filter date-filter"
-                type="date"
                 title="From Date"
                 aria-label="From date"
                 value={historyDateFrom}
-                onChange={(e) => setHistoryDateFrom(e.target.value)}
+                onChange={setHistoryDateFrom}
               />
 
-              <input
+              <DateInput
                 className="mini-filter date-filter"
-                type="date"
                 title="To Date"
                 aria-label="To date"
                 value={historyDateTo}
-                onChange={(e) => setHistoryDateTo(e.target.value)}
+                onChange={setHistoryDateTo}
               />
 
               <button type="button" className="btn btn-secondary history-export-btn" onClick={handleExportHistoryPdf}>
@@ -2557,13 +2681,10 @@ export default function App() {
                           </td>
                           <td>
                             {isInlineEditing ? (
-                              <input
+                              <DateInput
                                 className="history-inline-input"
-                                type="date"
                                 value={historyInlineDraft?.date || getTodayDate()}
-                                onChange={(event) =>
-                                  handleInlineHistoryDraftChange("date", event.target.value)
-                                }
+                                onChange={(value) => handleInlineHistoryDraftChange("date", value)}
                               />
                             ) : (
                               <bdi dir="ltr">{formatDateDDMMYYYY(record.date)}</bdi>
@@ -2780,11 +2901,10 @@ export default function App() {
               </div>
             </div>
             <form className="expenditure-form" onSubmit={handleExpenditureSubmit}>
-              <input
+              <DateInput
                 className="mini-filter"
-                type="date"
                 value={expenditureDate}
-                onChange={(event) => setExpenditureDate(event.target.value)}
+                onChange={setExpenditureDate}
                 required
               />
               <input
@@ -2840,19 +2960,17 @@ export default function App() {
                 value={expenditureSearch}
                 onChange={(event) => setExpenditureSearch(event.target.value)}
               />
-              <input
+              <DateInput
                 className="mini-filter"
-                type="date"
                 title="From date"
                 value={expenditureDateFrom}
-                onChange={(event) => setExpenditureDateFrom(event.target.value)}
+                onChange={setExpenditureDateFrom}
               />
-              <input
+              <DateInput
                 className="mini-filter"
-                type="date"
                 title="To date"
                 value={expenditureDateTo}
-                onChange={(event) => setExpenditureDateTo(event.target.value)}
+                onChange={setExpenditureDateTo}
               />
               <button type="button" className="btn btn-secondary expenditure-export-btn" onClick={handleExportExpenditurePdf}>
                 Export PDF
@@ -2882,14 +3000,13 @@ export default function App() {
                       <tr key={record.id}>
                         <td>
                           {editingExpenditureId === record.id ? (
-                            <input
+                            <DateInput
                               className="history-inline-input"
-                              type="date"
                               value={editingExpenditureDraft?.date || getTodayDate()}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setEditingExpenditureDraft((current) => ({
                                   ...(current || {}),
-                                  date: event.target.value,
+                                  date: value,
                                 }))
                               }
                             />
@@ -3089,7 +3206,7 @@ export default function App() {
 
                 <label className="field">
                   <span>تاریخ</span>
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                  <DateInput value={date} onChange={setDate} required />
                 </label>
               </div>
             </header>

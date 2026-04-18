@@ -6,7 +6,8 @@
     "start": "parcel index.html --open",
     "build": "parcel build index.html",
     "git:sync": "node scripts/git-sync.js",
-    "git:push": "node scripts/git-sync.js"
+    "git:push": "node scripts/git-sync.js",
+    "git:push-latest": "node scripts/git-push-latest.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
