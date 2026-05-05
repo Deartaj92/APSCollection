@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./hooks/useToast";
 import { supabase } from "./lib/supabaseClient";
 
@@ -341,7 +341,7 @@ function mapDbExpenditureToUiRecord(row) {
 
 function getInvoicePrintHtml(record) {
   const items = Array.isArray(record.feeItems) ? record.feeItems : [];
-  const targetRows = 10;
+  const targetRows = 8;
   const paddedItems = [...items];
   while (paddedItems.length < targetRows) {
     paddedItems.push({ item: "", amount: "" });
@@ -378,8 +378,8 @@ function getInvoicePrintHtml(record) {
           <th>کلاس</th>
         </tr>
         <tr>
-          <td>${record.studentName || "-"}</td>
-          <td>${record.fatherName || "-"}</td>
+          <td class="double-font">${record.studentName || "-"}</td>
+          <td class="double-font">${record.fatherName || "-"}</td>
           <td>${record.className || "-"}</td>
         </tr>
       </table>
@@ -456,13 +456,13 @@ function getInvoicePrintHtml(record) {
             font-family: "Segoe UI", Tahoma, sans-serif;
             font-weight: 700;
           }
-          .school { margin: 18px 0 2px; text-align: center; font-size: 40px; line-height: 1.2; }
-          .address { margin: 0 0 10px; text-align: center; font-size: 18px; font-weight: 700; line-height: 1.2; }
+          .school { margin: 18px 0 2px; text-align: center; font-size: 44px; line-height: 1.2; }
+          .address { margin: 0 0 10px; text-align: center; font-size: 20px; font-weight: 700; line-height: 1.2; }
           .meta {
             display: grid;
             grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            font-size: 18px;
+            font-size: 20px;
             margin-bottom: 8px;
             border-top: 1px solid #111;
             border-bottom: 1px solid #111;
@@ -473,7 +473,7 @@ function getInvoicePrintHtml(record) {
           .meta-title {
             text-align: center;
             font-weight: 900;
-            font-size: 26px;
+            font-size: 30px;
             letter-spacing: 0.02em;
             color: #000;
             background: #f3f3f3;
@@ -484,7 +484,8 @@ function getInvoicePrintHtml(record) {
           }
           .date-ltr, .num-ltr { direction: ltr; unicode-bidi: isolate; }
           table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #111; padding: 6px 8px; text-align: center; font-size: 24px; line-height: 1.25; }
+          th, td { border: 1px solid #111; padding: 6px 8px; text-align: center; font-size: 28px; line-height: 1.25; }
+          .double-font { font-size: 40px; font-weight: 700; }
           .mini { margin-bottom: 10px; }
           .items { direction: rtl; }
           .mini th,
@@ -494,10 +495,10 @@ function getInvoicePrintHtml(record) {
           .items .amt { width: 120px; text-align: center; }
           .items td:nth-child(2), .items th:nth-child(2) { text-align: right; }
           .bottom { margin-top: 10px; display: grid; grid-template-columns: 1fr 220px; gap: 10px; align-items: end; }
-          .notes p { margin: 2px 0; font-size: 21px; }
+          .notes p { margin: 2px 0; font-size: 24px; }
           .totals th { text-align: right; background: #f4f4f4; }
           .totals td { width: 90px; font-weight: 700; }
-          .footer-note { margin-top: 14px; font-size: 17px; text-align: center; }
+          .footer-note { margin-top: 14px; font-size: 20px; text-align: center; }
           @media print {
             @page { size: A5 landscape; margin: 4mm; }
             body {
@@ -527,23 +528,24 @@ function getInvoicePrintHtml(record) {
               flex-direction: column;
             }
             .copy-tag { font-size: 9px; margin-bottom: 3px; padding: 1px 8px; }
-            .school { font-size: 28px; margin: 4px 0 0; line-height: 1.1; }
-            .address { font-size: 14px; margin: 0 0 5px; line-height: 1.1; }
+            .school { font-size: 32px; margin: 4px 0 0; line-height: 1.1; }
+            .address { font-size: 16px; margin: 0 0 5px; line-height: 1.1; }
             .meta {
-              font-size: 12px;
+              font-size: 14px;
               padding: 4px 0;
               margin-bottom: 6px;
             }
             .meta-title {
-              font-size: 16px;
+              font-size: 20px;
               padding: 2px 10px;
               border-width: 1.5px;
             }
             th, td {
-              font-size: 12px;
+              font-size: 14px;
               padding: 3px 4px;
               line-height: 1.15;
             }
+            .double-font { font-size: 20px; font-weight: 700; }
             .mini { margin-bottom: 6px; }
             .items tr { height: 22px; }
             .bottom {
@@ -551,9 +553,9 @@ function getInvoicePrintHtml(record) {
               grid-template-columns: 1fr 128px;
               gap: 6px;
             }
-            .notes p { margin: 1px 0; font-size: 12px; }
+            .notes p { margin: 1px 0; font-size: 14px; }
             .totals td { width: 58px; }
-            .footer-note { margin-top: 6px; font-size: 11px; }
+            .footer-note { margin-top: 6px; font-size: 12px; }
           }
         </style>
       </head>
