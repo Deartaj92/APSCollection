@@ -659,6 +659,8 @@ function getHistoryPdfHtml(records, filters = {}) {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
+            justify-content: center;
+            text-align: center;
             border: 1px solid #e5e7eb;
             padding: 8px;
             border-radius: 4px;
@@ -778,7 +780,7 @@ function getExpenditurePdfHtml(records, filters = {}) {
 
   return `
     <!doctype html>
-    <html lang="ur" dir="rtl">
+    <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -817,6 +819,8 @@ function getExpenditurePdfHtml(records, filters = {}) {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
+            justify-content: center;
+            text-align: center;
             border: 1px solid #e5e7eb;
             padding: 8px;
             border-radius: 4px;
@@ -839,8 +843,9 @@ function getExpenditurePdfHtml(records, filters = {}) {
             background: #edf2f7;
             font-weight: 700;
           }
-          .num, th:nth-child(3), td:nth-child(3) { text-align: right; }
-          .num { font-variant-numeric: tabular-nums; }
+          .num { text-align: right; font-variant-numeric: tabular-nums; }
+          th:nth-child(3), td:nth-child(3),
+          th:nth-child(5), td:nth-child(5) { text-align: left; }
           .empty {
             border: 1px dashed #aaa;
             padding: 12px;
