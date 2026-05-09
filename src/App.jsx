@@ -305,11 +305,11 @@ function transliterateRomanToUrdu(value) {
 function mapDbPaymentToUiRecord(row) {
   const items = Array.isArray(row.fee_payment_items)
     ? [...row.fee_payment_items]
-        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-        .map((item) => ({
-          item: item.item_name || "",
-          amount: toWholeNumber(item.amount),
-        }))
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        item: item.item_name || "",
+        amount: toWholeNumber(item.amount),
+      }))
     : [];
 
   return {
@@ -395,11 +395,10 @@ function getInvoicePrintHtml(record) {
 
       <div class="bottom">
         <div class="notes">
-          ${
-            copyTitle === "OFFICE COPY"
-              ? ""
-              : '<p><strong>وصول کنندہ:</strong> __________</p>'
-          }
+          ${copyTitle === "OFFICE COPY"
+      ? ""
+      : '<p><strong>وصول کنندہ:</strong> __________</p>'
+    }
         </div>
         <table class="totals">
           <tr><th>کل</th><td>${record.totalAmount}</td></tr>
@@ -569,7 +568,7 @@ function getInvoicePrintHtml(record) {
   `;
 }
 
-function getHistoryPdfHtml(records) {
+function getHistoryPdfHtml(records, filters = {}) {
   const generatedOn = new Date();
   const generatedDate = formatDateDDMMYYYY(generatedOn.toISOString().split("T")[0]);
   const totalCollected = records.reduce((sum, row) => sum + toWholeNumber(row.amountReceived), 0);
@@ -577,16 +576,17 @@ function getHistoryPdfHtml(records) {
   const totalBilled = records.reduce((sum, row) => sum + toWholeNumber(row.totalAmount), 0);
 
   const rowsHtml = records
-    .map((record) => {
+    .map((record, index) => {
       const itemsHtml =
         record.feeItems && record.feeItems.length
           ? record.feeItems
-              .map((item) => `${escapeHtml(item.item || "-")} (${escapeHtml(item.amount || 0)})`)
-              .join(", ")
+            .map((item) => `${escapeHtml(item.item || "-")} (${escapeHtml(item.amount || 0)})`)
+            .join(", ")
           : "-";
 
       return `
         <tr>
+          <td>${index + 1}</td>
           <td class="mono">${escapeHtml(record.invoiceNo || "-")}</td>
           <td class="mono">${escapeHtml(formatDateDDMMYYYY(record.date))}</td>
           <td>${escapeHtml(record.studentName || "-")}</td>
@@ -601,9 +601,26 @@ function getHistoryPdfHtml(records) {
     })
     .join("");
 
+  const totalRowHtml = `
+    <tr class="total-row">
+      <td colspan="7" style="text-align: left;"><strong>کل:</strong></td>
+      <td class="num"><strong>${totalBilled}</strong></td>
+      <td class="num"><strong>${totalCollected}</strong></td>
+      <td class="num"><strong>${totalRemaining}</strong></td>
+    </tr>
+  `;
+
+  const filtersHtml = `
+    <div class="filters-summary">
+      ${filters.search ? `<span><strong>Search:</strong> ${escapeHtml(filters.search)}</span>` : ""}
+      ${filters.className ? `<span><strong>Class:</strong> ${escapeHtml(filters.className)}</span>` : ""}
+      ${filters.dateFrom || filters.dateTo ? `<span><strong>Range:</strong> ${escapeHtml(formatDateDDMMYYYY(filters.dateFrom))} to ${escapeHtml(formatDateDDMMYYYY(filters.dateTo))}</span>` : ""}
+    </div>
+  `;
+
   return `
     <!doctype html>
-    <html lang="en">
+    <html lang="ur" dir="rtl">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -619,12 +636,14 @@ function getHistoryPdfHtml(records) {
           }
           .head {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
             margin-bottom: 8px;
             border-bottom: 1px solid #d7dce3;
             padding-bottom: 6px;
+            text-align: center;
           }
           h1 { margin: 0; font-size: 19px; letter-spacing: 0.01em; }
           .meta {
@@ -633,28 +652,19 @@ function getHistoryPdfHtml(records) {
             text-align: right;
             line-height: 1.5;
           }
-          .summary {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 6px;
-            margin: 8px 0 10px;
-          }
-          .summary-card {
-            border: 1px solid #d7dce3;
-            background: #f7f9fc;
-            border-radius: 6px;
-            padding: 6px 8px;
-          }
-          .summary-card .label {
+          .filters-summary {
+            margin-bottom: 12px;
             font-size: 11px;
-            color: #5b6470;
-            margin-bottom: 2px;
+            color: #4b5563;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            border-radius: 4px;
+            background: #f9fafb;
           }
-          .summary-card .value {
-            font-size: 15px;
-            font-weight: 700;
-            color: #111827;
-          }
+          .filters-summary span { display: inline-block; }
           table {
             width: 100%;
             border-collapse: collapse;
@@ -664,7 +674,7 @@ function getHistoryPdfHtml(records) {
             border: 1px solid #d7dce3;
             padding: 5px 6px;
             font-size: 11px;
-            text-align: left;
+            text-align: center;
             vertical-align: middle;
             overflow-wrap: anywhere;
           }
@@ -674,15 +684,18 @@ function getHistoryPdfHtml(records) {
             color: #1f2937;
           }
           .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-          .num { text-align: right; font-variant-numeric: tabular-nums; }
+          .num, .items-full, th:nth-child(4), th:nth-child(5), td:nth-child(4), td:nth-child(5) { text-align: right; }
+          .num { font-variant-numeric: tabular-nums; }
           .items-full { line-height: 1.35; }
-          th:nth-child(1) { width: 8%; }
+          th:nth-child(1) { width: 4%; }
           th:nth-child(2) { width: 8%; }
-          th:nth-child(3) { width: 14%; }
-          th:nth-child(4) { width: 14%; }
-          th:nth-child(5) { width: 6%; }
-          th:nth-child(6) { width: 24%; }
-          th:nth-child(7), th:nth-child(8), th:nth-child(9) { width: 8.6%; }
+          th:nth-child(3) { width: 10%; }
+          th:nth-child(4) { width: 13%; }
+          th:nth-child(5) { width: 13%; }
+          th:nth-child(6) { width: 7%; }
+          th:nth-child(7) { width: 19%; }
+          th:nth-child(8), th:nth-child(9), th:nth-child(10) { width: 8.6%; }
+          .total-row td { background: #f1f5f9; border-top: 2px solid #cbd5e1; }
           .empty {
             margin-top: 16px;
             border: 1px dashed #aaa;
@@ -698,75 +711,74 @@ function getHistoryPdfHtml(records) {
       <body>
         <div class="head">
           <h1>Payment History Report</h1>
-          <div class="meta">
-            Generated on: ${escapeHtml(generatedDate)}<br />
-            Records: ${records.length}
           </div>
         </div>
-        <div class="summary">
-          <div class="summary-card">
-            <div class="label">Total Billed</div>
-            <div class="value">${escapeHtml(totalBilled)}</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Collected</div>
-            <div class="value">${escapeHtml(totalCollected)}</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Remaining</div>
-            <div class="value">${escapeHtml(totalRemaining)}</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Invoices</div>
-            <div class="value">${records.length}</div>
-          </div>
-        </div>
-        ${
-          records.length
-            ? `<table>
+        ${filtersHtml}
+        ${records.length
+      ? `<table>
                 <thead>
                   <tr>
-                    <th>Invoice</th>
-                    <th>Date</th>
-                    <th>Student</th>
-                    <th>Father</th>
-                    <th>Class</th>
-                    <th>Items</th>
-                    <th>Total</th>
-                    <th>Received</th>
-                    <th>Remaining</th>
+                    <th>#</th>
+                    <th>انوائس نمبر</th>
+                    <th>تاریخ</th>
+                    <th>طالب علم</th>
+                    <th>والد</th>
+                    <th>کلاس</th>
+                    <th>آئٹمز</th>
+                    <th>کل رقم</th>
+                    <th>وصول</th>
+                    <th>بقایا</th>
                   </tr>
                 </thead>
-                <tbody>${rowsHtml}</tbody>
+                <tbody>
+                  ${rowsHtml}
+                  ${totalRowHtml}
+                </tbody>
               </table>`
-            : '<div class="empty">No records found for current filters.</div>'
-        }
+      : '<div class="empty">No records found for current filters.</div>'
+    }
       </body>
     </html>
   `;
 }
 
-function getExpenditurePdfHtml(records) {
+function getExpenditurePdfHtml(records, filters = {}) {
   const generatedOn = new Date();
   const generatedDate = formatDateDDMMYYYY(generatedOn.toISOString().split("T")[0]);
   const totalAmount = records.reduce((sum, row) => sum + toWholeNumber(row.amount), 0);
 
   const rowsHtml = records
-    .map(
-      (record) => `
+    .map((record, index) => {
+      return `
         <tr>
+          <td>${index + 1}</td>
           <td>${escapeHtml(formatDateDDMMYYYY(record.date))}</td>
           <td>${escapeHtml(record.title || "-")}</td>
           <td class="num">${escapeHtml(record.amount)}</td>
           <td>${escapeHtml(record.notes || "-")}</td>
         </tr>
-      `
-    )
+      `;
+    })
     .join("");
+
+  const totalRowHtml = `
+    <tr class="total-row">
+      <td colspan="3" style="text-align: left;"><strong>Grand Total:</strong></td>
+      <td class="num"><strong>${totalAmount}</strong></td>
+      <td></td>
+    </tr>
+  `;
+
+  const filtersHtml = `
+    <div class="filters-summary">
+      ${filters.search ? `<span><strong>Search:</strong> ${escapeHtml(filters.search)}</span>` : ""}
+      ${filters.dateFrom || filters.dateTo ? `<span><strong>Range:</strong> ${escapeHtml(formatDateDDMMYYYY(filters.dateFrom))} to ${escapeHtml(formatDateDDMMYYYY(filters.dateTo))}</span>` : ""}
+    </div>
+  `;
 
   return `
     <!doctype html>
-    <html lang="en">
+    <html lang="ur" dir="rtl">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -782,12 +794,14 @@ function getExpenditurePdfHtml(records) {
           }
           .head {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 10px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
             margin-bottom: 10px;
             border-bottom: 1px solid #d7dce3;
             padding-bottom: 6px;
+            text-align: center;
           }
           h1 { margin: 0; font-size: 20px; }
           .meta {
@@ -796,11 +810,20 @@ function getExpenditurePdfHtml(records) {
             text-align: right;
             line-height: 1.45;
           }
-          .summary {
-            margin-bottom: 10px;
-            font-size: 13px;
-            color: #334155;
+          .filters-summary {
+            margin-bottom: 12px;
+            font-size: 11px;
+            color: #4b5563;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            border-radius: 4px;
+            background: #f9fafb;
           }
+          .filters-summary span { display: inline-block; }
+          .total-row td { background: #f1f5f9; border-top: 2px solid #cbd5e1; }
           table {
             width: 100%;
             border-collapse: collapse;
@@ -809,14 +832,15 @@ function getExpenditurePdfHtml(records) {
             border: 1px solid #d7dce3;
             padding: 6px 8px;
             font-size: 12px;
-            text-align: left;
+            text-align: center;
             vertical-align: middle;
           }
           th {
             background: #edf2f7;
             font-weight: 700;
           }
-          .num { text-align: right; font-variant-numeric: tabular-nums; }
+          .num, th:nth-child(3), td:nth-child(3) { text-align: right; }
+          .num { font-variant-numeric: tabular-nums; }
           .empty {
             border: 1px dashed #aaa;
             padding: 12px;
@@ -829,29 +853,26 @@ function getExpenditurePdfHtml(records) {
         </style>
       </head>
       <body>
-        <div class="head">
-          <h1>Expenditure Report</h1>
-          <div class="meta">
-            Generated on: ${escapeHtml(generatedDate)}<br />
-            Records: ${records.length}
-          </div>
         </div>
-        <div class="summary">Total Expenditure: <strong>${escapeHtml(totalAmount)}</strong></div>
-        ${
-          records.length
-            ? `<table>
+        ${filtersHtml}
+        ${records.length
+      ? `<table>
                 <thead>
                   <tr>
+                    <th>#</th>
                     <th>Date</th>
                     <th>Title</th>
                     <th>Amount</th>
                     <th>Notes</th>
                   </tr>
                 </thead>
-                <tbody>${rowsHtml}</tbody>
+                <tbody>
+                  ${rowsHtml}
+                  ${totalRowHtml}
+                </tbody>
               </table>`
-            : '<div class="empty">No expenditure records found for current filters.</div>'
-        }
+      : '<div class="empty">No expenditure records found for current filters.</div>'
+    }
       </body>
     </html>
   `;
@@ -917,7 +938,7 @@ function getDashboardPdfHtml(data, isPrivate = false) {
 
   return `
     <!doctype html>
-    <html lang="en">
+    <html lang="ur" dir="rtl">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -933,14 +954,16 @@ function getDashboardPdfHtml(data, isPrivate = false) {
           }
           .head {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             margin-bottom: 10px;
             border-bottom: 1px solid #d7dce3;
             padding-bottom: 6px;
+            text-align: center;
           }
           h1 { margin: 0; font-size: 20px; }
-          .meta { font-size: 12px; color: #5b6470; text-align: right; line-height: 1.45; }
+          .meta { font-size: 12px; color: #5b6470; text-align: center; line-height: 1.45; }
           .kpis {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -967,11 +990,12 @@ function getDashboardPdfHtml(data, isPrivate = false) {
             border: 1px solid #d7dce3;
             padding: 6px 8px;
             font-size: 12px;
-            text-align: left;
+            text-align: center;
             vertical-align: middle;
           }
           th { background: #edf2f7; }
           .num { text-align: right; font-variant-numeric: tabular-nums; }
+          .grid table th:nth-child(2), .grid table td:nth-child(2) { text-align: right; }
           .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1001,10 +1025,10 @@ function getDashboardPdfHtml(data, isPrivate = false) {
           <div class="kpi"><span>Total Expenditure</span><strong>${escapeHtml(mask(data.totals.spent))}</strong></div>
           <div class="kpi"><span>Cash in Hand</span><strong>${escapeHtml(mask(data.totals.cashInHand))}</strong></div>
           <div class="kpi"><span>Total Invoices / Expenditures</span><strong>${escapeHtml(mask(data.invoiceCount))} / ${escapeHtml(
-            mask(
-            data.expenseCount
-            )
-          )}</strong></div>
+    mask(
+      data.expenseCount
+    )
+  )}</strong></div>
           <div class="kpi"><span>Collection This Month</span><strong>${escapeHtml(mask(data.monthCollected))}</strong></div>
           <div class="kpi"><span>Spent This Month</span><strong>${escapeHtml(mask(data.monthSpent))}</strong></div>
           <div class="kpi"><span>Collection Today</span><strong>${escapeHtml(mask(data.todayCollected))}</strong></div>
@@ -1520,20 +1544,20 @@ export default function App() {
 
       const paymentQuery = editingPaymentId
         ? supabase
-            .from("fee_payments")
-            .update(payload)
-            .eq("id", editingPaymentId)
-            .select(
-              "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
-            )
-            .single()
+          .from("fee_payments")
+          .update(payload)
+          .eq("id", editingPaymentId)
+          .select(
+            "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
+          )
+          .single()
         : supabase
-            .from("fee_payments")
-            .insert(payload)
-            .select(
-              "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
-            )
-            .single();
+          .from("fee_payments")
+          .insert(payload)
+          .select(
+            "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
+          )
+          .single();
 
       const { data: paymentRow, error: paymentError } = await paymentQuery;
 
@@ -1622,10 +1646,10 @@ export default function App() {
       feeItems:
         (record.feeItems || []).length > 0
           ? record.feeItems.map((item) => ({
-              id: crypto.randomUUID(),
-              item: item.item || "",
-              amount: String(toWholeNumber(item.amount)),
-            }))
+            id: crypto.randomUUID(),
+            item: item.item || "",
+            amount: String(toWholeNumber(item.amount)),
+          }))
           : [{ id: crypto.randomUUID(), item: "", amount: "" }],
     });
   };
@@ -1664,12 +1688,12 @@ export default function App() {
         feeItems: (current.feeItems || []).map((item) =>
           item.id === itemId
             ? {
-                ...item,
-                [field]:
-                  field === "amount"
-                    ? sanitizeWholeInput(value)
-                    : transliterateRomanToUrdu(value),
-              }
+              ...item,
+              [field]:
+                field === "amount"
+                  ? sanitizeWholeInput(value)
+                  : transliterateRomanToUrdu(value),
+            }
             : item
         ),
       };
@@ -1975,7 +1999,12 @@ export default function App() {
   };
 
   const handleExportHistoryPdf = () => {
-    const html = getHistoryPdfHtml(filteredPaymentHistory);
+    const html = getHistoryPdfHtml(filteredPaymentHistory, {
+      search: historySearch,
+      className: historyClassFilter,
+      dateFrom: historyDateFrom,
+      dateTo: historyDateTo,
+    });
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const exportUrl = URL.createObjectURL(blob);
     const exportWindow = window.open(exportUrl, "_blank", "width=1280,height=900");
@@ -2192,7 +2221,11 @@ export default function App() {
   );
 
   const handleExportExpenditurePdf = () => {
-    const html = getExpenditurePdfHtml(filteredExpenditureHistory);
+    const html = getExpenditurePdfHtml(filteredExpenditureHistory, {
+      search: expenditureSearch,
+      dateFrom: expenditureDateFrom,
+      dateTo: expenditureDateTo,
+    });
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const exportUrl = URL.createObjectURL(blob);
     const exportWindow = window.open(exportUrl, "_blank", "width=1280,height=900");
@@ -2412,161 +2445,162 @@ export default function App() {
           ) : (() => {
             const m = (v) => (isDashboardPrivate ? "••••" : v);
             return (
-            <div className="dashboard-layout">
-              <div className="dashboard-kpis">
-                <article className="kpi-card">
-                  <span>Total Fee Collected</span>
-                  <strong>{m(dashboardData.totals.collected)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Total Expenditure</span>
-                  <strong>{m(dashboardData.totals.spent)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Total Invoices / Expenditures</span>
-                  <strong>
-                    {m(dashboardData.invoiceCount)} / {m(dashboardData.expenseCount)}
-                  </strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Cash in Hand</span>
-                  <strong>{m(dashboardData.totals.cashInHand)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Collection This Month</span>
-                  <strong>{m(dashboardData.monthCollected)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Spent This Month</span>
-                  <strong>{m(dashboardData.monthSpent)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Collection Today</span>
-                  <strong>{m(dashboardData.todayCollected)}</strong>
-                </article>
-                <article className="kpi-card">
-                  <span>Spent Today</span>
-                  <strong>{m(dashboardData.todaySpent)}</strong>
-                </article>
-              </div>
+              <div className="dashboard-layout">
+                <div className="dashboard-kpis">
+                  <article className="kpi-card">
+                    <span>Total Fee Collected</span>
+                    <strong>{m(dashboardData.totals.collected)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Total Expenditure</span>
+                    <strong>{m(dashboardData.totals.spent)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Total Invoices / Expenditures</span>
+                    <strong>
+                      {m(dashboardData.invoiceCount)} / {m(dashboardData.expenseCount)}
+                    </strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Cash in Hand</span>
+                    <strong>{m(dashboardData.totals.cashInHand)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Collection This Month</span>
+                    <strong>{m(dashboardData.monthCollected)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Spent This Month</span>
+                    <strong>{m(dashboardData.monthSpent)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Collection Today</span>
+                    <strong>{m(dashboardData.todayCollected)}</strong>
+                  </article>
+                  <article className="kpi-card">
+                    <span>Spent Today</span>
+                    <strong>{m(dashboardData.todaySpent)}</strong>
+                  </article>
+                </div>
 
-              <div className="dashboard-panels">
-                <section className="dashboard-panel">
-                  <div className="panel-head">
-                    <h3>Monthly Income vs Expenditure</h3>
-                    <span>Last 6 months</span>
-                  </div>
-                  {dashboardData.monthlyComparisonSeries.length === 0 ? (
-                    <div className="history-empty">No records available.</div>
-                  ) : (
-                    <div className="dashboard-mini-table-wrap">
-                      <table className="history-table dashboard-mini-table">
-                        <thead>
-                          <tr>
-                            <th>Month</th>
-                            <th>Fee Income</th>
-                            <th>Expenditure</th>
-                            <th>Net</th>
-                            <th>Invoices</th>
-                            <th>Expenses</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dashboardData.monthlyComparisonSeries.map((row) => (
-                            <tr key={row.label}>
-                              <td>{m(row.label)}</td>
-                              <td>{m(row.income)}</td>
-                              <td>{m(row.expense)}</td>
-                              <td>{m(row.net)}</td>
-                              <td>{m(row.invoices)}</td>
-                              <td>{m(row.expenseEntries)}</td>
+                <div className="dashboard-panels">
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Monthly Income vs Expenditure</h3>
+                      <span>Last 6 months</span>
+                    </div>
+                    {dashboardData.monthlyComparisonSeries.length === 0 ? (
+                      <div className="history-empty">No records available.</div>
+                    ) : (
+                      <div className="dashboard-mini-table-wrap">
+                        <table className="history-table dashboard-mini-table">
+                          <thead>
+                            <tr>
+                              <th>Month</th>
+                              <th>Fee Income</th>
+                              <th>Expenditure</th>
+                              <th>Net</th>
+                              <th>Invoices</th>
+                              <th>Expenses</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
+                          </thead>
+                          <tbody>
+                            {dashboardData.monthlyComparisonSeries.map((row) => (
+                              <tr key={row.label}>
+                                <td>{m(row.label)}</td>
+                                <td>{m(row.income)}</td>
+                                <td>{m(row.expense)}</td>
+                                <td>{m(row.net)}</td>
+                                <td>{m(row.invoices)}</td>
+                                <td>{m(row.expenseEntries)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
 
-                <section className="dashboard-panel">
-                  <div className="panel-head">
-                    <h3>Daily Income vs Expenditure</h3>
-                    <span>Last 7 days</span>
-                  </div>
-                  {dashboardData.dailyComparisonSeries.length === 0 ? (
-                    <div className="history-empty">No records available.</div>
-                  ) : (
-                    <div className="dashboard-mini-table-wrap">
-                      <table className="history-table dashboard-mini-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Fee Income</th>
-                            <th>Expenditure</th>
-                            <th>Net</th>
-                            <th>Invoices</th>
-                            <th>Expenses</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dashboardData.dailyComparisonSeries.map((row) => (
-                            <tr key={row.label}>
-                              <td>{m(row.label)}</td>
-                              <td>{m(row.income)}</td>
-                              <td>{m(row.expense)}</td>
-                              <td>{m(row.net)}</td>
-                              <td>{m(row.invoices)}</td>
-                              <td>{m(row.expenseEntries)}</td>
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Daily Income vs Expenditure</h3>
+                      <span>Last 7 days</span>
+                    </div>
+                    {dashboardData.dailyComparisonSeries.length === 0 ? (
+                      <div className="history-empty">No records available.</div>
+                    ) : (
+                      <div className="dashboard-mini-table-wrap">
+                        <table className="history-table dashboard-mini-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Fee Income</th>
+                              <th>Expenditure</th>
+                              <th>Net</th>
+                              <th>Invoices</th>
+                              <th>Expenses</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-              </div>
+                          </thead>
+                          <tbody>
+                            {dashboardData.dailyComparisonSeries.map((row) => (
+                              <tr key={row.label}>
+                                <td>{m(row.label)}</td>
+                                <td>{m(row.income)}</td>
+                                <td>{m(row.expense)}</td>
+                                <td>{m(row.net)}</td>
+                                <td>{m(row.invoices)}</td>
+                                <td>{m(row.expenseEntries)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+                </div>
 
-              <div className="dashboard-panels">
-                <section className="dashboard-panel">
-                  <div className="panel-head">
-                    <h3>Highest Outstanding</h3>
-                  </div>
-                  {dashboardData.outstandingRecords.length === 0 ? (
-                    <div className="history-empty">No outstanding records.</div>
-                  ) : (
-                    <div className="dashboard-list">
-                      {dashboardData.outstandingRecords.map((record) => (
-                        <div className="dashboard-list-row" key={`due-${record.id}`}>
-                          <span>{m(record.invoiceNo)}</span>
-                          <span>{m(record.studentName || "-")}</span>
-                          <span>{m(record.remainingAmount)}</span>
-                        </div>
-                      ))}
+                <div className="dashboard-panels">
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Highest Outstanding</h3>
                     </div>
-                  )}
-                </section>
+                    {dashboardData.outstandingRecords.length === 0 ? (
+                      <div className="history-empty">No outstanding records.</div>
+                    ) : (
+                      <div className="dashboard-list">
+                        {dashboardData.outstandingRecords.map((record) => (
+                          <div className="dashboard-list-row" key={`due-${record.id}`}>
+                            <span>{m(record.invoiceNo)}</span>
+                            <span>{m(record.studentName || "-")}</span>
+                            <span>{m(record.remainingAmount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
 
-                <section className="dashboard-panel">
-                  <div className="panel-head">
-                    <h3>Largest Expenditures</h3>
-                  </div>
-                  {dashboardData.topExpenditureRecords.length === 0 ? (
-                    <div className="history-empty">No expenditure records.</div>
-                  ) : (
-                    <div className="dashboard-list">
-                      {dashboardData.topExpenditureRecords.map((record) => (
-                        <div className="dashboard-list-row" key={`exp-${record.id}`}>
-                          <span>{m(formatDateDDMMYYYY(record.date))}</span>
-                          <span>{m(record.title || "-")}</span>
-                          <span>{m(record.amount)}</span>
-                        </div>
-                      ))}
+                  <section className="dashboard-panel">
+                    <div className="panel-head">
+                      <h3>Largest Expenditures</h3>
                     </div>
-                  )}
-                </section>
+                    {dashboardData.topExpenditureRecords.length === 0 ? (
+                      <div className="history-empty">No expenditure records.</div>
+                    ) : (
+                      <div className="dashboard-list">
+                        {dashboardData.topExpenditureRecords.map((record) => (
+                          <div className="dashboard-list-row" key={`exp-${record.id}`}>
+                            <span>{m(formatDateDDMMYYYY(record.date))}</span>
+                            <span>{m(record.title || "-")}</span>
+                            <span>{m(record.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
               </div>
-            </div>
-          );})()}
+            );
+          })()}
         </section>
       ) : activePage === "history" ? (
         <section className="card history-card">
@@ -2635,6 +2669,7 @@ export default function App() {
               <table className="history-table">
                 <thead>
                   <tr>
+                    <th className="history-sno-cell">#</th>
                     <th>انوائس نمبر</th>
                     <th>تاریخ</th>
                     <th>طالب علم</th>
@@ -2648,7 +2683,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPaymentHistory.map((record) => {
+                  {filteredPaymentHistory.map((record, index) => {
                     const isInlineEditing = historyInlineEditId === record.id;
                     const inlineItems = isInlineEditing ? historyInlineDraft?.feeItems || [] : [];
                     const inlineTotalAmount = isInlineEditing
@@ -2656,8 +2691,8 @@ export default function App() {
                       : record.totalAmount;
                     const itemsText = (record.feeItems || []).length
                       ? record.feeItems
-                          .map((item) => `${item.item || "Unnamed"} (${toWholeNumber(item.amount)})`)
-                          .join(", ")
+                        .map((item) => `${item.item || "Unnamed"} (${toWholeNumber(item.amount)})`)
+                        .join(", ")
                       : "کوئی آئٹم نہیں";
                     const inlineReceived = isInlineEditing
                       ? toWholeNumber(historyInlineDraft?.amountReceived)
@@ -2667,6 +2702,7 @@ export default function App() {
                     return (
                       <Fragment key={record.id}>
                         <tr>
+                          <td className="history-sno-cell">{index + 1}</td>
                           <td>
                             {isInlineEditing ? (
                               <input
@@ -2990,6 +3026,7 @@ export default function App() {
                 <table className="history-table">
                   <thead>
                     <tr>
+                      <th className="history-sno-cell">#</th>
                       <th>Date</th>
                       <th>Title</th>
                       <th>Amount</th>
@@ -2998,8 +3035,9 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredExpenditureHistory.map((record) => (
+                    {filteredExpenditureHistory.map((record, index) => (
                       <tr key={record.id}>
+                        <td className="history-sno-cell">{index + 1}</td>
                         <td>
                           {editingExpenditureId === record.id ? (
                             <DateInput
@@ -3141,26 +3179,26 @@ export default function App() {
       ) : (
         <section className="card">
           <form className="payment-form" onSubmit={handleSubmit}>
-                <header className="form-header">
-                  <div className="form-title-row">
-                    <h1>{editingPaymentId ? "طلبہ فیس ادائیگی (ترمیم)" : "طلبہ فیس ادائیگی"}</h1>
-                    <div className="form-title-tools">
-                      <span className="invoice-chip">Invoice: {invoiceNo}</span>
-                      <label className="print-prompt-toggle" title="Enable/disable print prompt after save">
-                        <input
-                          type="checkbox"
-                          checked={isPrintPromptEnabled}
-                          onChange={(e) => {
-                            setIsPrintPromptEnabled(e.target.checked);
-                            if (!e.target.checked) {
-                              setPrintConfirmRecord(null);
-                            }
-                          }}
-                        />
-                        <span>Print Prompt</span>
-                      </label>
-                    </div>
-                  </div>
+            <header className="form-header">
+              <div className="form-title-row">
+                <h1>{editingPaymentId ? "طلبہ فیس ادائیگی (ترمیم)" : "طلبہ فیس ادائیگی"}</h1>
+                <div className="form-title-tools">
+                  <span className="invoice-chip">Invoice: {invoiceNo}</span>
+                  <label className="print-prompt-toggle" title="Enable/disable print prompt after save">
+                    <input
+                      type="checkbox"
+                      checked={isPrintPromptEnabled}
+                      onChange={(e) => {
+                        setIsPrintPromptEnabled(e.target.checked);
+                        if (!e.target.checked) {
+                          setPrintConfirmRecord(null);
+                        }
+                      }}
+                    />
+                    <span>Print Prompt</span>
+                  </label>
+                </div>
+              </div>
               <div className="grid grid-4">
                 <label className="field">
                   <span>طالب علم کا نام</span>
@@ -3291,12 +3329,12 @@ export default function App() {
                 </label>
               </section>
 
-                  <div className="actions">
-                    <button type="submit" className="btn btn-primary" disabled={isSavingPayment}>
-                      {isSavingPayment ? "Saving..." : editingPaymentId ? "Update" : "Save"}
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={handleReset}>
-                      Reset
+              <div className="actions">
+                <button type="submit" className="btn btn-primary" disabled={isSavingPayment}>
+                  {isSavingPayment ? "Saving..." : editingPaymentId ? "Update" : "Save"}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={handleReset}>
+                  Reset
                 </button>
               </div>
             </footer>
