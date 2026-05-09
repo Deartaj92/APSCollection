@@ -858,6 +858,8 @@ function getExpenditurePdfHtml(records, filters = {}) {
         </style>
       </head>
       <body>
+        <div class="head">
+          <h1>Expenditure List</h1>
         </div>
         ${filtersHtml}
         ${records.length
