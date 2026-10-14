@@ -10,6 +10,15 @@ function createInitialFeeItems() {
   return [createFeeItem(), createFeeItem(), createFeeItem()];
 }
 
+const FEE_PRESETS = [
+  "ماہانہ فیس",
+  "داخلہ فیس",
+  "امتحانی فیس",
+  "کتب و کاپیاں",
+  "یونیفارم",
+  "ٹرانسپورٹ",
+];
+
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
@@ -28,7 +37,7 @@ function formatDateDDMMYYYY(value) {
   if (!year || !month || !day) {
     return value;
   }
-  return `${day}/${month}/${year}`;
+  return `${day}-${month}-${year}`;
 }
 
 function parseDateDDMMYYYY(value) {
@@ -37,7 +46,7 @@ function parseDateDDMMYYYY(value) {
     return "";
   }
 
-  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (!match) {
     return null;
   }
@@ -72,9 +81,9 @@ function formatDateInputDraft(value) {
     return digits;
   }
   if (digits.length <= 4) {
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}-${digits.slice(2)}`;
   }
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
 }
 
 function escapeHtml(value) {
@@ -92,6 +101,24 @@ function toWholeNumber(value) {
     return 0;
   }
   return Math.max(Math.round(parsed), 0);
+}
+
+function formatAmount(value) {
+  if (value === null || value === undefined || value === "") {
+    return "0";
+  }
+  if (typeof value === "number") {
+    return value.toLocaleString();
+  }
+  const str = String(value).trim();
+  if (str === "") {
+    return "0";
+  }
+  const parsed = Number(str);
+  if (!Number.isFinite(parsed)) {
+    return str;
+  }
+  return parsed.toLocaleString();
 }
 
 function sanitizeWholeInput(value) {
@@ -129,18 +156,100 @@ function getMessageDirection(message) {
 function DateInput({
   value,
   onChange,
-  className,
+  className = "",
   title,
   ariaLabel,
   required = false,
   disabled = false,
-  placeholder = "dd/mm/yyyy",
+  placeholder = "dd-mm-yyyy",
 }) {
   const [draft, setDraft] = useState(value ? formatDateDDMMYYYY(value) : "");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     setDraft(value ? formatDateDDMMYYYY(value) : "");
   }, [value]);
+
+  const initialDate = useMemo(() => {
+    if (value) {
+      const parts = value.split("-").map(Number);
+      if (parts[0] && parts[1] && parts[2]) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
+    return new Date();
+  }, [value]);
+
+  const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
+
+  const openCalendar = () => {
+    if (disabled) return;
+    if (value) {
+      const parts = value.split("-").map(Number);
+      if (parts[0] && parts[1]) {
+        setViewYear(parts[0]);
+        setViewMonth(parts[1] - 1);
+      }
+    } else {
+      const now = new Date();
+      setViewYear(now.getFullYear());
+      setViewMonth(now.getMonth());
+    }
+    setIsOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen]);
+
+  const handlePrevMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  const handleSelectDay = (year, month, day) => {
+    const isoString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    setDraft(`${String(day).padStart(2, "0")}-${String(month + 1).padStart(2, "0")}-${year}`);
+    onChange(isoString);
+    setIsOpen(false);
+  };
+
+  const handleSelectToday = (e) => {
+    e.stopPropagation();
+    const now = new Date();
+    handleSelectDay(now.getFullYear(), now.getMonth(), now.getDate());
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    setDraft("");
+    onChange("");
+    setIsOpen(false);
+  };
 
   const handleChange = (event) => {
     const formattedValue = formatDateInputDraft(event.target.value);
@@ -173,22 +282,168 @@ function DateInput({
     setDraft(value ? formatDateDDMMYYYY(value) : "");
   };
 
+  const calendarDays = useMemo(() => {
+    const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+    const days = [];
+
+    // Previous month trailing days
+    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+      days.push({
+        day: daysInPrevMonth - i,
+        month: viewMonth === 0 ? 11 : viewMonth - 1,
+        year: viewMonth === 0 ? viewYear - 1 : viewYear,
+        isCurrentMonth: false,
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push({
+        day: d,
+        month: viewMonth,
+        year: viewYear,
+        isCurrentMonth: true,
+      });
+    }
+
+    // Next month leading days
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      days.push({
+        day: d,
+        month: viewMonth === 11 ? 0 : viewMonth + 1,
+        year: viewMonth === 11 ? viewYear + 1 : viewYear,
+        isCurrentMonth: false,
+      });
+    }
+
+    return days;
+  }, [viewYear, viewMonth]);
+
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ];
+
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }, []);
+
   return (
-    <input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      className={className}
-      title={title}
-      aria-label={ariaLabel}
-      placeholder={placeholder}
-      value={draft}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      required={required}
-      disabled={disabled}
-      dir="ltr"
-    />
+    <div className="date-input-container" ref={containerRef}>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        className={`date-input-field ${className}`}
+        title={title}
+        aria-label={ariaLabel}
+        placeholder={placeholder}
+        value={draft}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onClick={openCalendar}
+        required={required}
+        disabled={disabled}
+        dir="ltr"
+      />
+      <button
+        type="button"
+        className="date-picker-trigger"
+        onClick={() => (isOpen ? setIsOpen(false) : openCalendar())}
+        title="Open calendar"
+        aria-label="Open calendar"
+        disabled={disabled}
+        tabIndex={-1}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="calendar-popover" role="dialog" aria-modal="false">
+          <div className="calendar-header">
+            <button
+              type="button"
+              className="calendar-nav-btn"
+              onClick={handlePrevMonth}
+              title="Previous month"
+              aria-label="Previous month"
+            >
+              ‹
+            </button>
+            <span className="calendar-title">
+              {monthNames[viewMonth]} {viewYear}
+            </span>
+            <button
+              type="button"
+              className="calendar-nav-btn"
+              onClick={handleNextMonth}
+              title="Next month"
+              aria-label="Next month"
+            >
+              ›
+            </button>
+          </div>
+
+          <div className="calendar-weekdays">
+            <span className="calendar-weekday">Su</span>
+            <span className="calendar-weekday">Mo</span>
+            <span className="calendar-weekday">Tu</span>
+            <span className="calendar-weekday">We</span>
+            <span className="calendar-weekday">Th</span>
+            <span className="calendar-weekday">Fr</span>
+            <span className="calendar-weekday">Sa</span>
+          </div>
+
+          <div className="calendar-grid">
+            {calendarDays.map((item, index) => {
+              const itemIso = `${item.year}-${String(item.month + 1).padStart(2, "0")}-${String(item.day).padStart(2, "0")}`;
+              const isSelected = value === itemIso;
+              const isToday = todayIso === itemIso;
+
+              return (
+                <button
+                  key={`${item.year}-${item.month}-${item.day}-${index}`}
+                  type="button"
+                  className={`calendar-day-btn ${!item.isCurrentMonth ? "is-other-month" : ""} ${isSelected ? "is-selected" : ""} ${isToday ? "is-today" : ""}`}
+                  onClick={() => handleSelectDay(item.year, item.month, item.day)}
+                >
+                  {item.day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="calendar-footer">
+            <button
+              type="button"
+              className="calendar-quick-btn"
+              onClick={handleSelectToday}
+            >
+              Today
+            </button>
+            {!required && (
+              <button
+                type="button"
+                className="calendar-quick-btn calendar-clear-btn"
+                onClick={handleClear}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1336,7 +1591,7 @@ export default function App() {
       .filter((record) => record.date === todayDate)
       .reduce((sum, record) => sum + toWholeNumber(record.amount), 0);
 
-    const monthlyIncomeMap = paymentsInRange.reduce((map, record) => {
+    const allMonthlyIncomeMap = paymentHistory.reduce((map, record) => {
       const key = String(record.date || "").slice(0, 7);
       if (!key) {
         return map;
@@ -1349,7 +1604,7 @@ export default function App() {
       return map;
     }, {});
 
-    const monthlyExpenseMap = expendituresInRange.reduce((map, record) => {
+    const allMonthlyExpenseMap = expenditureHistory.reduce((map, record) => {
       const key = String(record.date || "").slice(0, 7);
       if (!key) {
         return map;
@@ -1362,25 +1617,36 @@ export default function App() {
       return map;
     }, {});
 
-    const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
-    const monthlyKeys = Array.from(
-      new Set([...Object.keys(monthlyIncomeMap), ...Object.keys(monthlyExpenseMap)])
-    )
-      .sort((a, b) => a.localeCompare(b))
-      .slice(-6);
+    // Anchor the 6-month window to the latest date (or current month)
+    const latestRecordDate = [...paymentHistory, ...expenditureHistory].reduce((latest, r) => {
+      if (r.date && r.date > latest) return r.date;
+      return latest;
+    }, getTodayDate());
 
-    const monthlyComparisonSeries = monthlyKeys.map((key) => {
+    const [anchorYear, anchorMonth] = latestRecordDate.split("-").map(Number);
+    const anchor = new Date(anchorYear, (anchorMonth || 1) - 1, 1);
+
+    const last6MonthsKeys = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      last6MonthsKeys.push(`${y}-${m}`);
+    }
+
+    const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
+    const monthlyComparisonSeries = last6MonthsKeys.map((key) => {
       const [rowYear, rowMonth] = key.split("-").map(Number);
       const labelDate = new Date(rowYear, (rowMonth || 1) - 1, 1);
-      const income = monthlyIncomeMap[key]?.income || 0;
-      const expense = monthlyExpenseMap[key]?.expense || 0;
+      const income = allMonthlyIncomeMap[key]?.income || 0;
+      const expense = allMonthlyExpenseMap[key]?.expense || 0;
       return {
         label: monthFormatter.format(labelDate),
         income,
         expense,
         net: income - expense,
-        invoices: monthlyIncomeMap[key]?.invoices || 0,
-        expenseEntries: monthlyExpenseMap[key]?.expenses || 0,
+        invoices: allMonthlyIncomeMap[key]?.invoices || 0,
+        expenseEntries: allMonthlyExpenseMap[key]?.expenses || 0,
       };
     });
 
@@ -1468,6 +1734,20 @@ export default function App() {
 
   const addFeeItem = () => {
     setFeeItems((current) => [...current, createFeeItem()]);
+  };
+
+  const addFeePreset = (name) => {
+    setFeeItems((current) => {
+      const emptyIndex = current.findIndex(
+        (item) => !String(item.item || "").trim() && (!item.amount || item.amount === "0")
+      );
+      if (emptyIndex !== -1) {
+        return current.map((item, idx) =>
+          idx === emptyIndex ? { ...item, item: name } : item
+        );
+      }
+      return [...current, { id: crypto.randomUUID(), item: name, amount: "" }];
+    });
   };
 
   const removeFeeItem = (id) => {
@@ -2263,8 +2543,14 @@ export default function App() {
       <main className={`app-shell login-shell ${isDarkMode ? "theme-dark" : ""}`}>
         <section className="card login-card">
           <div className="login-head">
+            <div className="login-logo-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+            </div>
             <h1>Fee Collection Management</h1>
-            <p>Sign in to continue.</p>
+            <p>Sign in to continue to APS Portal</p>
           </div>
           <form
             ref={loginFormRef}
@@ -2328,6 +2614,63 @@ export default function App() {
   return (
     <main className={`app-shell ${isDarkMode ? "theme-dark" : ""}`}>
       <header className="app-header">
+        <div className="app-title-wrap">
+          <div className="app-title-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12v5c3 3 9 3 12 0v-5" />
+            </svg>
+          </div>
+          <div className="app-title">APS Fee Portal</div>
+        </div>
+
+        <nav className="app-nav" aria-label="Page navigation">
+          <button
+            type="button"
+            className={`nav-link ${activePage === "home" ? "is-active" : ""}`}
+            onClick={() => setActivePage("home")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Home
+          </button>
+          <button
+            type="button"
+            className={`nav-link ${activePage === "collect-fee" ? "is-active" : ""}`}
+            onClick={() => setActivePage("collect-fee")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+              <line x1="1" y1="10" x2="23" y2="10" />
+            </svg>
+            Collect Fee
+          </button>
+          <button
+            type="button"
+            className={`nav-link ${activePage === "history" ? "is-active" : ""}`}
+            onClick={() => setActivePage("history")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            History
+          </button>
+          <button
+            type="button"
+            className={`nav-link ${activePage === "expenditure" ? "is-active" : ""}`}
+            onClick={() => setActivePage("expenditure")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Expenditure
+          </button>
+        </nav>
+
         <div className="header-actions">
           <button
             type="button"
@@ -2361,132 +2704,159 @@ export default function App() {
             </svg>
           </button>
         </div>
-        <div className="app-title-wrap">
-          <div className="app-title">Fee Collection Management</div>
-        </div>
-        <nav className="app-nav" aria-label="Page navigation">
-          <button
-            type="button"
-            className={`nav-link ${activePage === "home" ? "is-active" : ""}`}
-            onClick={() => setActivePage("home")}
-          >
-            Home
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${activePage === "collect-fee" ? "is-active" : ""}`}
-            onClick={() => setActivePage("collect-fee")}
-          >
-            Collect Fee
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${activePage === "history" ? "is-active" : ""}`}
-            onClick={() => setActivePage("history")}
-          >
-            History
-          </button>
-          <button
-            type="button"
-            className={`nav-link ${activePage === "expenditure" ? "is-active" : ""}`}
-            onClick={() => setActivePage("expenditure")}
-          >
-            Expenditure
-          </button>
-        </nav>
       </header>
 
       {activePage === "home" ? (
         <section className="card dashboard-card">
-          <div className="history-head">
-            <div className="history-head-info">
+          <div className="dashboard-head">
+            <div className="dashboard-head-info">
               <h2>Dashboard</h2>
-              <span className="history-count">
-                Fee invoices: {isDashboardPrivate ? "••••" : dashboardData.invoiceCount} | Expense entries: {isDashboardPrivate ? "••••" : dashboardData.expenseCount}
+              <span className="dashboard-count">
+                Fee invoices: {isDashboardPrivate ? "••••" : dashboardData.invoiceCount} &bull; Expense entries: {isDashboardPrivate ? "••••" : dashboardData.expenseCount}
               </span>
             </div>
-            <div className="dashboard-inline-filters">
-              <DateInput
-                className="mini-filter date-filter"
-                title="From Date"
-                aria-label="Dashboard from date"
-                value={dashboardDateFrom}
-                onChange={setDashboardDateFrom}
-              />
-              <DateInput
-                className="mini-filter date-filter"
-                title="To Date"
-                aria-label="Dashboard to date"
-                value={dashboardDateTo}
-                onChange={setDashboardDateTo}
-              />
+            <div className="dashboard-toolbar">
+              <div className="dashboard-date-filter-group">
+                <DateInput
+                  className="mini-filter date-filter"
+                  title="From Date"
+                  ariaLabel="Dashboard from date"
+                  placeholder="From Date"
+                  value={dashboardDateFrom}
+                  onChange={setDashboardDateFrom}
+                />
+                <span className="date-sep">&ndash;</span>
+                <DateInput
+                  className="mini-filter date-filter"
+                  title="To Date"
+                  ariaLabel="Dashboard to date"
+                  placeholder="To Date"
+                  value={dashboardDateTo}
+                  onChange={setDashboardDateTo}
+                />
+              </div>
+              <button
+                type="button"
+                className={`btn btn-secondary history-export-btn${isDashboardPrivate ? " privacy-active" : ""}`}
+                onClick={() => setIsDashboardPrivate((prev) => !prev)}
+                title={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
+                aria-label={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
+              >
+                {isDashboardPrivate ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+                {isDashboardPrivate ? "Show" : "Hide"}
+              </button>
+              <button type="button" className="btn btn-primary history-export-btn" onClick={handleExportDashboardPdf}>
+                Export PDF
+              </button>
             </div>
-            <button
-              type="button"
-              className={`btn btn-secondary history-export-btn${isDashboardPrivate ? " privacy-active" : ""}`}
-              onClick={() => setIsDashboardPrivate((prev) => !prev)}
-              title={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
-              aria-label={isDashboardPrivate ? "Show amounts" : "Hide amounts"}
-            >
-              {isDashboardPrivate ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" style={{ verticalAlign: "middle", marginInlineEnd: 4 }}>
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              )}
-              {isDashboardPrivate ? "Show" : "Hide"}
-            </button>
-            <button type="button" className="btn btn-secondary history-export-btn" onClick={handleExportDashboardPdf}>
-              Export PDF
-            </button>
           </div>
 
           {isLoadingHistory || isLoadingExpenditures ? (
             <div className="history-empty">Loading dashboard data...</div>
           ) : (() => {
-            const m = (v) => (isDashboardPrivate ? "••••" : v);
+            const m = (v) => (isDashboardPrivate ? "••••" : formatAmount(v));
             return (
               <div className="dashboard-layout">
                 <div className="dashboard-kpis">
-                  <article className="kpi-card">
-                    <span>Total Fee Collected</span>
+                  <article className="kpi-card kpi-collected">
+                    <div className="kpi-card-header">
+                      <span>Total Fee Collected</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.totals.collected)}</strong>
+                    <small>All time receipts</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Total Expenditure</span>
+
+                  <article className="kpi-card kpi-spent">
+                    <div className="kpi-card-header">
+                      <span>Total Expenditure</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.totals.spent)}</strong>
+                    <small>All time spent</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Total Invoices / Expenditures</span>
+
+                  <article className="kpi-card kpi-invoices">
+                    <div className="kpi-card-header">
+                      <span>Total Invoices / Expenses</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      </div>
+                    </div>
                     <strong>
-                      {m(dashboardData.invoiceCount)} / {m(dashboardData.expenseCount)}
+                      {isDashboardPrivate ? "••••" : `${formatAmount(dashboardData.invoiceCount)} / ${formatAmount(dashboardData.expenseCount)}`}
                     </strong>
+                    <small>Processed records</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Cash in Hand</span>
+
+                  <article className="kpi-card kpi-cash">
+                    <div className="kpi-card-header">
+                      <span>Cash in Hand</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.totals.cashInHand)}</strong>
+                    <small>Net cash balance</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Collection This Month</span>
+
+                  <article className="kpi-card kpi-month-coll">
+                    <div className="kpi-card-header">
+                      <span>Collection This Month</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.monthCollected)}</strong>
+                    <small>Current month</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Spent This Month</span>
+
+                  <article className="kpi-card kpi-month-spent">
+                    <div className="kpi-card-header">
+                      <span>Spent This Month</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.monthSpent)}</strong>
+                    <small>Current month</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Collection Today</span>
+
+                  <article className="kpi-card kpi-today-coll">
+                    <div className="kpi-card-header">
+                      <span>Collection Today</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.todayCollected)}</strong>
+                    <small>Today's receipts</small>
                   </article>
-                  <article className="kpi-card">
-                    <span>Spent Today</span>
+
+                  <article className="kpi-card kpi-today-spent">
+                    <div className="kpi-card-header">
+                      <span>Spent Today</span>
+                      <div className="kpi-icon-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                      </div>
+                    </div>
                     <strong>{m(dashboardData.todaySpent)}</strong>
+                    <small>Today's payouts</small>
                   </article>
                 </div>
 
@@ -2500,7 +2870,7 @@ export default function App() {
                       <div className="history-empty">No records available.</div>
                     ) : (
                       <div className="dashboard-mini-table-wrap">
-                        <table className="history-table dashboard-mini-table">
+                        <table className="dashboard-mini-table">
                           <thead>
                             <tr>
                               <th>Month</th>
@@ -2514,12 +2884,14 @@ export default function App() {
                           <tbody>
                             {dashboardData.monthlyComparisonSeries.map((row) => (
                               <tr key={row.label}>
-                                <td>{m(row.label)}</td>
-                                <td>{m(row.income)}</td>
-                                <td>{m(row.expense)}</td>
-                                <td>{m(row.net)}</td>
-                                <td>{m(row.invoices)}</td>
-                                <td>{m(row.expenseEntries)}</td>
+                                <td className="cell-label">{isDashboardPrivate ? "••••" : row.label}</td>
+                                <td className="cell-num">{m(row.income)}</td>
+                                <td className="cell-num">{m(row.expense)}</td>
+                                <td className={`cell-num ${row.net > 0 ? "net-pos" : row.net < 0 ? "net-neg" : ""}`}>
+                                  {isDashboardPrivate ? "••••" : (row.net > 0 ? `+${formatAmount(row.net)}` : formatAmount(row.net))}
+                                </td>
+                                <td className="cell-count">{m(row.invoices)}</td>
+                                <td className="cell-count">{m(row.expenseEntries)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2537,7 +2909,7 @@ export default function App() {
                       <div className="history-empty">No records available.</div>
                     ) : (
                       <div className="dashboard-mini-table-wrap">
-                        <table className="history-table dashboard-mini-table">
+                        <table className="dashboard-mini-table">
                           <thead>
                             <tr>
                               <th>Date</th>
@@ -2551,12 +2923,14 @@ export default function App() {
                           <tbody>
                             {dashboardData.dailyComparisonSeries.map((row) => (
                               <tr key={row.label}>
-                                <td>{m(row.label)}</td>
-                                <td>{m(row.income)}</td>
-                                <td>{m(row.expense)}</td>
-                                <td>{m(row.net)}</td>
-                                <td>{m(row.invoices)}</td>
-                                <td>{m(row.expenseEntries)}</td>
+                                <td className="cell-label">{isDashboardPrivate ? "••••" : row.label}</td>
+                                <td className="cell-num">{m(row.income)}</td>
+                                <td className="cell-num">{m(row.expense)}</td>
+                                <td className={`cell-num ${row.net > 0 ? "net-pos" : row.net < 0 ? "net-neg" : ""}`}>
+                                  {isDashboardPrivate ? "••••" : (row.net > 0 ? `+${formatAmount(row.net)}` : formatAmount(row.net))}
+                                </td>
+                                <td className="cell-count">{m(row.invoices)}</td>
+                                <td className="cell-count">{m(row.expenseEntries)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2566,61 +2940,35 @@ export default function App() {
                   </section>
                 </div>
 
-                <div className="dashboard-panels">
-                  <section className="dashboard-panel">
-                    <div className="panel-head">
-                      <h3>Highest Outstanding</h3>
-                    </div>
-                    {dashboardData.outstandingRecords.length === 0 ? (
-                      <div className="history-empty">No outstanding records.</div>
-                    ) : (
-                      <div className="dashboard-list">
-                        {dashboardData.outstandingRecords.map((record) => (
-                          <div className="dashboard-list-row" key={`due-${record.id}`}>
-                            <span>{m(record.invoiceNo)}</span>
-                            <span>{m(record.studentName || "-")}</span>
-                            <span>{m(record.remainingAmount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="dashboard-panel">
-                    <div className="panel-head">
-                      <h3>Largest Expenditures</h3>
-                    </div>
-                    {dashboardData.topExpenditureRecords.length === 0 ? (
-                      <div className="history-empty">No expenditure records.</div>
-                    ) : (
-                      <div className="dashboard-list">
-                        {dashboardData.topExpenditureRecords.map((record) => (
-                          <div className="dashboard-list-row" key={`exp-${record.id}`}>
-                            <span>{m(formatDateDDMMYYYY(record.date))}</span>
-                            <span>{m(record.title || "-")}</span>
-                            <span>{m(record.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                </div>
               </div>
             );
           })()}
         </section>
       ) : activePage === "history" ? (
-        <section className="card history-card">
+        <section className="card history-card" dir="ltr">
           <div className="history-head">
+            <div className="history-head-info">
+              <h2>Payment History</h2>
+              <span className="history-count">
+                Showing: {filteredPaymentHistory.length} / {paymentHistory.length}
+              </span>
+            </div>
+
             <div className="history-inline-filters">
-              <input
-                className="mini-filter search-filter"
-                type="text"
-                aria-label="Search"
-                placeholder="Student / Father / Class"
-                value={historySearch}
-                onChange={(e) => setUrduOnlyValue(setHistorySearch, e.target.value)}
-              />
+              <div className="history-search-wrap">
+                <svg className="history-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  className="mini-filter search-filter"
+                  type="text"
+                  aria-label="Search"
+                  placeholder="Student / Father / Class"
+                  value={historySearch}
+                  onChange={(e) => setUrduOnlyValue(setHistorySearch, e.target.value)}
+                />
+              </div>
 
               <select
                 className="mini-filter class-filter"
@@ -2636,32 +2984,35 @@ export default function App() {
                 ))}
               </select>
 
-              <DateInput
-                className="mini-filter date-filter"
-                title="From Date"
-                aria-label="From date"
-                value={historyDateFrom}
-                onChange={setHistoryDateFrom}
-              />
+              <div className="history-date-filter-group">
+                <DateInput
+                  title="From Date"
+                  ariaLabel="From date"
+                  value={historyDateFrom}
+                  onChange={setHistoryDateFrom}
+                />
+                <span className="date-sep">→</span>
+                <DateInput
+                  title="To Date"
+                  ariaLabel="To date"
+                  value={historyDateTo}
+                  onChange={setHistoryDateTo}
+                />
+              </div>
 
-              <DateInput
-                className="mini-filter date-filter"
-                title="To Date"
-                aria-label="To date"
-                value={historyDateTo}
-                onChange={setHistoryDateTo}
-              />
-
-              <button type="button" className="btn btn-secondary history-export-btn" onClick={handleExportHistoryPdf}>
+              <button
+                type="button"
+                className="btn btn-secondary history-export-btn"
+                onClick={handleExportHistoryPdf}
+                disabled={filteredPaymentHistory.length === 0}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
                 Export PDF
               </button>
-            </div>
-
-            <div className="history-head-info">
-              <h2>Payment History</h2>
-              <span className="history-count">
-                Showing: {filteredPaymentHistory.length} / {paymentHistory.length}
-              </span>
             </div>
           </div>
 
@@ -2672,7 +3023,7 @@ export default function App() {
           ) : filteredPaymentHistory.length === 0 ? (
             <div className="history-empty">فلٹر کے مطابق کوئی ریکارڈ نہیں ملا۔</div>
           ) : (
-            <div className="history-table-wrap">
+            <div className="history-table-wrap" dir="rtl">
               <table className="history-table">
                 <thead>
                   <tr>
@@ -2938,47 +3289,64 @@ export default function App() {
             <div className="expenditure-head">
               <div className="expenditure-head-main">
                 <h2>Expenditure Records</h2>
-                <span className="history-count">Total records: {expenditureHistory.length}</span>
+                <span className="history-count">Total entries: {expenditureHistory.length}</span>
               </div>
-              <div className="expenditure-total">
-                <span>Total spend</span>
-                <strong>{totalExpenditure}</strong>
+              <div className="expenditure-total" title="Overall total expenditure">
+                <span>Total Spend</span>
+                <strong>Rs. {formatAmount(totalExpenditure)}</strong>
               </div>
             </div>
             <form className="expenditure-form" onSubmit={handleExpenditureSubmit}>
-              <DateInput
-                className="mini-filter"
-                value={expenditureDate}
-                onChange={setExpenditureDate}
-                required
-              />
-              <input
-                className="mini-filter"
-                type="text"
-                placeholder="Expenditure title"
-                value={expenditureTitle}
-                onChange={(event) => setExpenditureTitle(event.target.value)}
-                required
-              />
-              <input
-                className="mini-filter"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Amount"
-                value={expenditureAmount}
-                onChange={(event) => setExpenditureAmount(sanitizeWholeInput(event.target.value))}
-                required
-              />
-              <input
-                className="mini-filter"
-                type="text"
-                placeholder="Notes (optional)"
-                value={expenditureNotes}
-                onChange={(event) => setExpenditureNotes(event.target.value)}
-              />
+              <label className="expenditure-field exp-field-date">
+                <span className="expenditure-field-label">Date</span>
+                <DateInput
+                  value={expenditureDate}
+                  onChange={setExpenditureDate}
+                  required
+                />
+              </label>
+
+              <label className="expenditure-field exp-field-title">
+                <span className="expenditure-field-label">Title / Category</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Utility bills, Books, Repairs..."
+                  value={expenditureTitle}
+                  onChange={(event) => setExpenditureTitle(event.target.value)}
+                  required
+                />
+              </label>
+
+              <label className="expenditure-field exp-field-amount">
+                <span className="expenditure-field-label">Amount (PKR)</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="0"
+                  value={expenditureAmount}
+                  onChange={(event) => setExpenditureAmount(sanitizeWholeInput(event.target.value))}
+                  required
+                />
+              </label>
+
+              <label className="expenditure-field exp-field-notes">
+                <span className="expenditure-field-label">Notes (Optional)</span>
+                <input
+                  type="text"
+                  placeholder="Remarks, receipt #, vendor..."
+                  value={expenditureNotes}
+                  onChange={(event) => setExpenditureNotes(event.target.value)}
+                />
+              </label>
+
               <button type="submit" className="btn btn-primary expenditure-save-btn" disabled={isSavingExpenditure}>
-                {isSavingExpenditure ? "Saving..." : "Save"}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                {isSavingExpenditure ? "Saving..." : "Save Record"}
               </button>
             </form>
           </section>
@@ -2986,40 +3354,55 @@ export default function App() {
           <section className="expenditure-history-section">
             <div className="expenditure-history-head">
               <div className="expenditure-history-title">
-                <h3>History</h3>
+                <h3>Expenditure History</h3>
                 <span className="history-count">
                   Showing: {filteredExpenditureHistory.length} / {expenditureHistory.length}
                 </span>
               </div>
-              <div className="expenditure-total">
-                <span>Total spend (filtered)</span>
-                <strong>{filteredExpenditureTotal}</strong>
-              </div>
-            </div>
 
-            <div className="expenditure-filters">
-              <input
-                className="mini-filter"
-                type="text"
-                placeholder="Search title / notes"
-                value={expenditureSearch}
-                onChange={(event) => setExpenditureSearch(event.target.value)}
-              />
-              <DateInput
-                className="mini-filter"
-                title="From date"
-                value={expenditureDateFrom}
-                onChange={setExpenditureDateFrom}
-              />
-              <DateInput
-                className="mini-filter"
-                title="To date"
-                value={expenditureDateTo}
-                onChange={setExpenditureDateTo}
-              />
-              <button type="button" className="btn btn-secondary expenditure-export-btn" onClick={handleExportExpenditurePdf}>
-                Export PDF
-              </button>
+              <div className="expenditure-history-toolbar">
+                <div className="expenditure-filtered-badge" title="Filtered spend based on current range">
+                  <span>Filtered:</span>
+                  <strong>Rs. {formatAmount(filteredExpenditureTotal)}</strong>
+                </div>
+
+                <div className="history-search-wrap">
+                  <svg className="history-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    className="mini-filter expenditure-search"
+                    type="text"
+                    placeholder="Search title / notes"
+                    value={expenditureSearch}
+                    onChange={(event) => setExpenditureSearch(event.target.value)}
+                  />
+                </div>
+
+                <div className="expenditure-date-filter-group">
+                  <DateInput
+                    title="From date"
+                    value={expenditureDateFrom}
+                    onChange={setExpenditureDateFrom}
+                  />
+                  <span className="date-sep">→</span>
+                  <DateInput
+                    title="To date"
+                    value={expenditureDateTo}
+                    onChange={setExpenditureDateTo}
+                  />
+                </div>
+
+                <button type="button" className="btn btn-secondary expenditure-export-btn" onClick={handleExportExpenditurePdf}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Export PDF
+                </button>
+              </div>
             </div>
 
             {isLoadingExpenditures ? (
@@ -3094,7 +3477,7 @@ export default function App() {
                               }
                             />
                           ) : (
-                            record.amount
+                            <span className="exp-amount-val">Rs. {formatAmount(record.amount)}</span>
                           )}
                         </td>
                         <td>
@@ -3184,13 +3567,18 @@ export default function App() {
           </section>
         </section>
       ) : (
-        <section className="card">
+        <section className="card collect-fee-card">
           <form className="payment-form" onSubmit={handleSubmit}>
             <header className="form-header">
               <div className="form-title-row">
-                <h1>{editingPaymentId ? "طلبہ فیس ادائیگی (ترمیم)" : "طلبہ فیس ادائیگی"}</h1>
+                <div className="form-title-text">
+                  <h1>{editingPaymentId ? "طلبہ فیس ادائیگی (ترمیم)" : "طلبہ فیس ادائیگی"}</h1>
+                  <span className="form-subtitle">فیس کی وصولی اور ریکارڈ کا اندراج کریں</span>
+                </div>
                 <div className="form-title-tools">
-                  <span className="invoice-chip">Invoice: {invoiceNo}</span>
+                  <span className="invoice-chip" title="Current invoice number">
+                    Invoice: {invoiceNo}
+                  </span>
                   <label className="print-prompt-toggle" title="Enable/disable print prompt after save">
                     <input
                       type="checkbox"
@@ -3206,7 +3594,7 @@ export default function App() {
                   </label>
                 </div>
               </div>
-              <div className="grid grid-4">
+              <div className="grid grid-4 form-student-grid">
                 <label className="field">
                   <span>طالب علم کا نام</span>
                   <input
@@ -3262,16 +3650,39 @@ export default function App() {
               <section className="fee-section" aria-labelledby="feeItemsHeading">
                 <div className="section-title-row">
                   <h2 id="feeItemsHeading">فیس آئٹمز</h2>
-                  <button type="button" className="btn btn-secondary" onClick={addFeeItem}>
-                    + آئٹم شامل کریں
+                  <button type="button" className="btn btn-secondary btn-add-fee" onClick={addFeeItem}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    آئٹم شامل کریں
                   </button>
+                </div>
+
+                <div className="fee-presets-bar">
+                  <span className="fee-presets-label">فوری انتخاب:</span>
+                  <div className="fee-presets-list">
+                    {FEE_PRESETS.map((preset) => (
+                      <button
+                        type="button"
+                        key={preset}
+                        className="fee-preset-chip"
+                        onClick={() => addFeePreset(preset)}
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="fee-items-scroll">
                   <div className="fee-items" role="group" aria-label="فیس آئٹمز کی فہرست">
                     {feeItems.map((fee, index) => (
                       <div className="fee-item" key={fee.id}>
-                        <label className="field">
+                        <div className="fee-item-index" title={`آئٹم نمبر ${index + 1}`}>
+                          #{index + 1}
+                        </div>
+                        <label className="field fee-name-field">
                           <span>آئٹم کا نام</span>
                           <input
                             ref={index === 0 ? firstItemNameRef : null}
@@ -3284,8 +3695,8 @@ export default function App() {
                           />
                         </label>
 
-                        <label className="field">
-                          <span>رقم</span>
+                        <label className="field fee-amount-field">
+                          <span>رقم (روپے)</span>
                           <input
                             type="number"
                             min="0"
@@ -3299,10 +3710,17 @@ export default function App() {
                         <div className="item-actions">
                           <button
                             type="button"
-                            className="btn btn-danger"
+                            className="btn btn-ghost btn-remove-item"
+                            title="Remove item"
+                            aria-label="Remove item"
                             onClick={() => removeFeeItem(fee.id)}
                           >
-                            Remove
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
                           </button>
                         </div>
                       </div>
@@ -3313,34 +3731,61 @@ export default function App() {
             </main>
 
             <footer className="form-footer">
-              <section className="totals grid grid-3">
-                <label className="field">
-                  <span>کل رقم</span>
-                  <input type="number" value={totalAmount} readOnly tabIndex={-1} />
-                </label>
+              <section className="totals-grid">
+                <div className="total-stat-card total-due">
+                  <span className="total-stat-label">کل رقم (Total)</span>
+                  <div className="total-stat-value">Rs. {formatAmount(totalAmount)}</div>
+                </div>
 
-                <label className="field">
-                  <span>وصول شدہ رقم</span>
+                <div className="total-stat-card total-received">
+                  <div className="total-stat-label-row">
+                    <span className="total-stat-label">وصول شدہ رقم (Received)</span>
+                    <button
+                      type="button"
+                      className="btn-quick-full"
+                      onClick={() => setAmountReceived(String(totalAmount))}
+                      title="مکمل وصولی درج کریں"
+                    >
+                      مکمل وصولی
+                    </button>
+                  </div>
                   <input
                     type="number"
                     min="0"
                     step="1"
+                    className="total-stat-input"
                     value={amountReceived}
                     onChange={(e) => setAmountReceived(sanitizeWholeInput(e.target.value))}
                   />
-                </label>
+                </div>
 
-                <label className="field">
-                  <span>بقایا رقم</span>
-                  <input type="number" value={remainingAmount} readOnly tabIndex={-1} />
-                </label>
+                <div className={`total-stat-card total-balance ${Number(remainingAmount) === 0 ? "is-cleared" : "is-due"}`}>
+                  <div className="total-stat-label-row">
+                    <span className="total-stat-label">بقایا رقم (Balance)</span>
+                    <span className="balance-badge">
+                      {Number(remainingAmount) === 0 ? "اداشدہ (Cleared)" : "بقایا (Due)"}
+                    </span>
+                  </div>
+                  <div className="total-stat-value">Rs. {formatAmount(remainingAmount)}</div>
+                </div>
               </section>
 
               <div className="actions">
                 <button type="submit" className="btn btn-primary" disabled={isSavingPayment}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
                   {isSavingPayment ? "Saving..." : editingPaymentId ? "Update" : "Save"}
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={handleReset}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                    <path d="M21 3v5h-5" />
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                    <path d="M3 21v-5h5" />
+                  </svg>
                   Reset
                 </button>
               </div>
