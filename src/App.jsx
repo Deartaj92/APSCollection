@@ -824,12 +824,6 @@ function getInvoicePrintHtml(record) {
 }
 
 function getHistoryPdfHtml(records, filters = {}) {
-  const generatedOn = new Date();
-  const generatedDate = formatDateDDMMYYYY(generatedOn.toISOString().split("T")[0]);
-  const totalCollected = records.reduce((sum, row) => sum + toWholeNumber(row.amountReceived), 0);
-  const totalRemaining = records.reduce((sum, row) => sum + toWholeNumber(row.remainingAmount), 0);
-  const totalBilled = records.reduce((sum, row) => sum + toWholeNumber(row.totalAmount), 0);
-
   const rowsHtml = records
     .map((record, index) => {
       const itemsHtml =
@@ -855,15 +849,6 @@ function getHistoryPdfHtml(records, filters = {}) {
       `;
     })
     .join("");
-
-  const totalRowHtml = `
-    <tr class="total-row">
-      <td colspan="7" style="text-align: left;"><strong>کل:</strong></td>
-      <td class="num"><strong>${totalBilled}</strong></td>
-      <td class="num"><strong>${totalCollected}</strong></td>
-      <td class="num"><strong>${totalRemaining}</strong></td>
-    </tr>
-  `;
 
   const filtersHtml = `
     <div class="filters-summary">
@@ -989,7 +974,6 @@ function getHistoryPdfHtml(records, filters = {}) {
                 </thead>
                 <tbody>
                   ${rowsHtml}
-                  ${totalRowHtml}
                 </tbody>
               </table>`
       : '<div class="empty">No records found for current filters.</div>'
