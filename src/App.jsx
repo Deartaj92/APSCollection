@@ -13,7 +13,7 @@ function createInitialFeeItems() {
 const FEE_PRESETS = [
   "ماہانہ فیس",
   "داخلہ فیس",
-  "امتحانی فیس",
+  "پیپر منی",
   "کتب و کاپیاں",
   "یونیفارم",
   "ٹرانسپورٹ",
@@ -1317,6 +1317,368 @@ function getDashboardPdfHtml(data, isPrivate = false) {
     </html>
   `;
 }
+function PaymentEditModal({
+  record,
+  onClose,
+  onSave,
+  isSaving,
+  toast,
+}) {
+  const [invoiceNo, setInvoiceNo] = useState(record.invoiceNo || "");
+  const [date, setDate] = useState(record.date || getTodayDate());
+  const [studentName, setStudentName] = useState(record.studentName || "");
+  const [fatherName, setFatherName] = useState(record.fatherName || "");
+  const [studentClass, setStudentClass] = useState(record.className || "");
+  const [feeItems, setFeeItems] = useState(() => {
+    return (record.feeItems || []).length > 0
+      ? record.feeItems.map((item) => ({
+          id: item.id || crypto.randomUUID(),
+          item: item.item || "",
+          amount:
+            item.amount !== undefined && item.amount !== null
+              ? String(toWholeNumber(item.amount))
+              : "",
+        }))
+      : createInitialFeeItems();
+  });
+  const [amountReceived, setAmountReceived] = useState(
+    record.amountReceived !== undefined && record.amountReceived !== null
+      ? String(toWholeNumber(record.amountReceived))
+      : "0"
+  );
+
+  const studentNameInputRef = useRef(null);
+  const firstItemInputRef = useRef(null);
+
+  useEffect(() => {
+    studentNameInputRef.current?.focus();
+  }, []);
+
+  const totalAmount = useMemo(() => {
+    return feeItems.reduce((sum, item) => sum + toWholeNumber(item.amount), 0);
+  }, [feeItems]);
+
+  const remainingAmount = useMemo(() => {
+    return Math.max(totalAmount - toWholeNumber(amountReceived), 0);
+  }, [totalAmount, amountReceived]);
+
+  const updateFeeItem = (id, field, value) => {
+    const nextValue =
+      field === "item" ? transliterateRomanToUrdu(value) : sanitizeWholeInput(value);
+    setFeeItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, [field]: nextValue } : item))
+    );
+  };
+
+  const addFeeItem = () => {
+    setFeeItems((current) => [...current, createFeeItem()]);
+  };
+
+  const addFeePreset = (name) => {
+    setFeeItems((current) => {
+      const emptyIndex = current.findIndex(
+        (item) => !String(item.item || "").trim() && (!item.amount || item.amount === "0")
+      );
+      if (emptyIndex !== -1) {
+        return current.map((item, idx) =>
+          idx === emptyIndex ? { ...item, item: name } : item
+        );
+      }
+      return [...current, { id: crypto.randomUUID(), item: name, amount: "" }];
+    });
+  };
+
+  const removeFeeItem = (id) => {
+    setFeeItems((current) => {
+      const next = current.filter((item) => item.id !== id);
+      return next.length ? next : [createFeeItem()];
+    });
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    const cleanFeeItems = feeItems
+      .map((item) => ({
+        item: String(item.item || "").trim(),
+        amount: toWholeNumber(item.amount),
+      }))
+      .filter((item) => item.item || item.amount > 0);
+
+    const hasOneCompleteFeeItem = cleanFeeItems.some(
+      (item) => item.item.trim() && toWholeNumber(item.amount) > 0
+    );
+
+    if (!hasOneCompleteFeeItem) {
+      toast.error("کم از کم ایک فیس آئٹم میں نام اور رقم درج کریں۔");
+      return;
+    }
+
+    const wholeAmountReceived = toWholeNumber(amountReceived);
+    if (wholeAmountReceived > totalAmount) {
+      toast.error("وصول شدہ رقم کل رقم سے زیادہ نہیں ہو سکتی۔");
+      return;
+    }
+
+    onSave({
+      ...record,
+      invoiceNo: invoiceNo.trim() || record.invoiceNo,
+      date: date || record.date,
+      studentName: studentName.trim(),
+      fatherName: fatherName.trim(),
+      className: studentClass.trim(),
+      feeItems: cleanFeeItems,
+      totalAmount,
+      amountReceived: wholeAmountReceived,
+      remainingAmount,
+    });
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        className="payment-edit-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-edit-modal-title"
+      >
+        <form className="payment-form" onSubmit={handleSubmit}>
+          <header className="form-header">
+            <div className="form-title-row">
+              <div className="form-title-text">
+                <h1 id="payment-edit-modal-title">طلبہ فیس ادائیگی (ترمیم)</h1>
+                <span className="form-subtitle">فیس کی وصولی اور ریکارڈ کا اندراج / ترمیم کریں</span>
+              </div>
+              <div className="form-title-tools">
+                <span className="invoice-chip" title="Current invoice number">
+                  Invoice: {invoiceNo}
+                </span>
+                <button
+                  type="button"
+                  className="modal-close-icon-btn"
+                  onClick={onClose}
+                  title="بند کریں (Close)"
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-4 form-student-grid">
+              <label className="field">
+                <span>طالب علم کا نام</span>
+                <input
+                  ref={studentNameInputRef}
+                  type="text"
+                  lang="ur"
+                  dir="rtl"
+                  placeholder="طالب علم کا نام درج کریں"
+                  value={studentName}
+                  onChange={(e) => setStudentName(transliterateRomanToUrdu(e.target.value))}
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>والد کا نام</span>
+                <input
+                  type="text"
+                  lang="ur"
+                  dir="rtl"
+                  placeholder="والد کا نام درج کریں"
+                  value={fatherName}
+                  onChange={(e) => setFatherName(transliterateRomanToUrdu(e.target.value))}
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>کلاس</span>
+                <input
+                  type="text"
+                  placeholder="مثلاً: جماعت 7"
+                  value={studentClass}
+                  onChange={(e) => setStudentClass(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Tab" && !e.shiftKey) {
+                      e.preventDefault();
+                      firstItemInputRef.current?.focus();
+                    }
+                  }}
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>تاریخ</span>
+                <DateInput value={date} onChange={setDate} required />
+              </label>
+            </div>
+          </header>
+
+          <main className="form-main">
+            <section className="fee-section" aria-labelledby="editFeeItemsHeading">
+              <div className="section-title-row">
+                <h2 id="editFeeItemsHeading">فیس آئٹمز</h2>
+                <button type="button" className="btn btn-secondary btn-add-fee" onClick={addFeeItem}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  آئٹم شامل کریں
+                </button>
+              </div>
+
+              <div className="fee-presets-bar">
+                <span className="fee-presets-label">فوری انتخاب:</span>
+                <div className="fee-presets-list">
+                  {FEE_PRESETS.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset}
+                      className="fee-preset-chip"
+                      onClick={() => addFeePreset(preset)}
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="fee-items-scroll">
+                <div className="fee-items" role="group" aria-label="فیس آئٹمز کی فہرست">
+                  {feeItems.map((fee, index) => (
+                    <div className="fee-item" key={fee.id}>
+                      <div className="fee-item-index" title={`آئٹم نمبر ${index + 1}`}>
+                        #{index + 1}
+                      </div>
+                      <label className="field fee-name-field">
+                        <span>آئٹم کا نام</span>
+                        <input
+                          ref={index === 0 ? firstItemInputRef : null}
+                          type="text"
+                          lang="ur"
+                          dir="rtl"
+                          value={fee.item}
+                          onChange={(e) => updateFeeItem(fee.id, "item", e.target.value)}
+                          placeholder="مثلاً: ماہانہ فیس"
+                        />
+                      </label>
+
+                      <label className="field fee-amount-field">
+                        <span>رقم (روپے)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={fee.amount}
+                          onChange={(e) => updateFeeItem(fee.id, "amount", e.target.value)}
+                          placeholder="0"
+                        />
+                      </label>
+
+                      <div className="item-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-remove-item"
+                          title="Remove item"
+                          aria-label="Remove item"
+                          onClick={() => removeFeeItem(fee.id)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </main>
+
+          <footer className="form-footer">
+            <section className="totals-grid">
+              <div className="total-stat-card total-due">
+                <span className="total-stat-label">کل رقم (Total)</span>
+                <div className="total-stat-value">Rs. {formatAmount(totalAmount)}</div>
+              </div>
+
+              <div className="total-stat-card total-received">
+                <div className="total-stat-label-row">
+                  <span className="total-stat-label">وصول شدہ رقم (Received)</span>
+                  <button
+                    type="button"
+                    className="btn-quick-full"
+                    onClick={() => setAmountReceived(String(totalAmount))}
+                    title="مکمل وصولی درج کریں"
+                  >
+                    مکمل وصولی
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="total-stat-input"
+                  value={amountReceived}
+                  onChange={(e) => setAmountReceived(sanitizeWholeInput(e.target.value))}
+                />
+              </div>
+
+              <div className={`total-stat-card total-balance ${Number(remainingAmount) === 0 ? "is-cleared" : "is-due"}`}>
+                <div className="total-stat-label-row">
+                  <span className="total-stat-label">بقایا رقم (Balance)</span>
+                  <span className="balance-badge">
+                    {Number(remainingAmount) === 0 ? "اداشدہ (Cleared)" : "بقایا (Due)"}
+                  </span>
+                </div>
+                <div className="total-stat-value">Rs. {formatAmount(remainingAmount)}</div>
+              </div>
+            </section>
+
+            <div className="actions">
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                {isSaving ? "Saving..." : "Update"}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={onClose}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+                Cancel
+              </button>
+            </div>
+          </footer>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(getStoredSessionUser);
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredSessionUser()));
@@ -1348,8 +1710,7 @@ export default function App() {
     return stored === null ? true : stored === "true";
   });
   const [editingPaymentId, setEditingPaymentId] = useState(null);
-  const [historyInlineEditId, setHistoryInlineEditId] = useState(null);
-  const [historyInlineDraft, setHistoryInlineDraft] = useState(null);
+  const [editingPaymentModalRecord, setEditingPaymentModalRecord] = useState(null);
   const [expenditureDate, setExpenditureDate] = useState(getTodayDate);
   const [expenditureTitle, setExpenditureTitle] = useState("");
   const [expenditureAmount, setExpenditureAmount] = useState("");
@@ -1902,150 +2263,22 @@ export default function App() {
     }, 0);
   };
 
-  const startInlineEdit = (record) => {
+  const handleStartEditPayment = (record) => {
     if (!record) {
       return;
     }
-    setHistoryInlineEditId(record.id);
-    setHistoryInlineDraft({
-      invoiceNo: record.invoiceNo || "",
-      date: record.date || getTodayDate(),
-      studentName: record.studentName || "",
-      fatherName: record.fatherName || "",
-      className: record.className || "",
-      amountReceived: String(toWholeNumber(record.amountReceived)),
-      feeItems:
-        (record.feeItems || []).length > 0
-          ? record.feeItems.map((item) => ({
-            id: crypto.randomUUID(),
-            item: item.item || "",
-            amount: String(toWholeNumber(item.amount)),
-          }))
-          : [{ id: crypto.randomUUID(), item: "", amount: "" }],
-    });
+    setEditingPaymentModalRecord(record);
   };
 
-  const handleInlineHistoryDraftChange = (field, value) => {
-    setHistoryInlineDraft((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        [field]: field === "amountReceived" ? sanitizeWholeInput(value) : value,
-      };
-    });
+  const handleCloseEditPaymentModal = () => {
+    setEditingPaymentModalRecord(null);
   };
 
-  const handleInlineHistoryUrduDraftChange = (field, value) => {
-    setHistoryInlineDraft((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        [field]: transliterateRomanToUrdu(value),
-      };
-    });
-  };
-
-  const handleInlineHistoryItemChange = (itemId, field, value) => {
-    setHistoryInlineDraft((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        feeItems: (current.feeItems || []).map((item) =>
-          item.id === itemId
-            ? {
-              ...item,
-              [field]:
-                field === "amount"
-                  ? sanitizeWholeInput(value)
-                  : transliterateRomanToUrdu(value),
-            }
-            : item
-        ),
-      };
-    });
-  };
-
-  const addInlineHistoryItem = () => {
-    setHistoryInlineDraft((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        feeItems: [...(current.feeItems || []), { id: crypto.randomUUID(), item: "", amount: "" }],
-      };
-    });
-  };
-
-  const removeInlineHistoryItem = (itemId) => {
-    setHistoryInlineDraft((current) => {
-      if (!current) {
-        return current;
-      }
-      const nextItems = (current.feeItems || []).filter((item) => item.id !== itemId);
-      return {
-        ...current,
-        feeItems: nextItems.length > 0 ? nextItems : [{ id: crypto.randomUUID(), item: "", amount: "" }],
-      };
-    });
-  };
-
-  const cancelInlineHistoryEdit = () => {
-    setHistoryInlineEditId(null);
-    setHistoryInlineDraft(null);
-  };
-
-  const saveInlineHistoryEdit = async () => {
-    if (!historyInlineEditId || !historyInlineDraft) {
-      return;
-    }
-
-    const currentRecord = paymentHistory.find((item) => item.id === historyInlineEditId);
-    if (!currentRecord) {
-      cancelInlineHistoryEdit();
-      return;
-    }
-
-    const cleanFeeItems = (historyInlineDraft.feeItems || [])
-      .map((item) => ({
-        item: String(item.item || "").trim(),
-        amount: toWholeNumber(item.amount),
-      }))
-      .filter((item) => item.item || item.amount > 0);
-
-    const hasOneCompleteFeeItem = cleanFeeItems.some(
-      (item) => item.item.trim() && toWholeNumber(item.amount) > 0
+  const handleSaveEditedPayment = async (updatedRecord) => {
+    setIsSavingPayment(true);
+    let updatedHistory = paymentHistory.map((item) =>
+      item.id === updatedRecord.id ? updatedRecord : item
     );
-    if (!hasOneCompleteFeeItem) {
-      toast.error("کم از کم ایک فیس آئٹم میں نام اور رقم درج کریں۔");
-      return;
-    }
-
-    const nextTotalAmount = cleanFeeItems.reduce((sum, item) => sum + toWholeNumber(item.amount), 0);
-    const nextAmountReceived = toWholeNumber(historyInlineDraft.amountReceived);
-    if (nextAmountReceived > nextTotalAmount) {
-      toast.error("وصول شدہ رقم کل رقم سے زیادہ نہیں ہو سکتی۔");
-      return;
-    }
-
-    const updatedRecord = {
-      ...currentRecord,
-      invoiceNo: historyInlineDraft.invoiceNo.trim() || currentRecord.invoiceNo,
-      date: historyInlineDraft.date || currentRecord.date,
-      studentName: historyInlineDraft.studentName.trim(),
-      fatherName: historyInlineDraft.fatherName.trim(),
-      className: historyInlineDraft.className.trim(),
-      feeItems: cleanFeeItems,
-      totalAmount: nextTotalAmount,
-      amountReceived: nextAmountReceived,
-      remainingAmount: Math.max(nextTotalAmount - nextAmountReceived, 0),
-    };
 
     if (supabase) {
       const payload = {
@@ -2058,33 +2291,35 @@ export default function App() {
         amount_received: updatedRecord.amountReceived,
       };
 
-      const { data, error } = await supabase
+      const { data: paymentRow, error: paymentError } = await supabase
         .from("fee_payments")
         .update(payload)
-        .eq("id", historyInlineEditId)
+        .eq("id", updatedRecord.id)
         .select(
           "id,invoice_no,payment_date,student_name,father_name,class_name,total_amount,amount_received,remaining_amount,created_at"
         )
         .single();
 
-      if (error) {
-        toast.error("ریکارڈ اپڈیٹ نہیں ہو سکا۔");
+      if (paymentError) {
+        setIsSavingPayment(false);
+        toast.error("ادائیگی اپڈیٹ نہیں ہو سکی۔");
         return;
       }
 
       const { error: deleteItemsError } = await supabase
         .from("fee_payment_items")
         .delete()
-        .eq("payment_id", historyInlineEditId);
+        .eq("payment_id", updatedRecord.id);
 
       if (deleteItemsError) {
+        setIsSavingPayment(false);
         toast.error("پرانے آئٹمز حذف نہیں ہو سکے۔");
         return;
       }
 
       if (updatedRecord.feeItems.length > 0) {
         const itemRows = updatedRecord.feeItems.map((item, index) => ({
-          payment_id: historyInlineEditId,
+          payment_id: updatedRecord.id,
           item_name: item.item,
           amount: item.amount,
           sort_order: index,
@@ -2092,22 +2327,35 @@ export default function App() {
 
         const { error: itemsError } = await supabase.from("fee_payment_items").insert(itemRows);
         if (itemsError) {
+          setIsSavingPayment(false);
           toast.error("آئٹمز محفوظ نہیں ہو سکے۔");
           return;
         }
       }
 
-      updatedRecord.totalAmount = toWholeNumber(data.total_amount);
-      updatedRecord.amountReceived = toWholeNumber(data.amount_received);
-      updatedRecord.remainingAmount = toWholeNumber(data.remaining_amount);
-      updatedRecord.createdAt = data.created_at;
+      const mappedRow = mapDbPaymentToUiRecord({
+        ...paymentRow,
+        fee_payment_items: updatedRecord.feeItems.map((item, index) => ({
+          item_name: item.item,
+          amount: item.amount,
+          sort_order: index,
+        })),
+      });
+
+      updatedHistory = paymentHistory.map((item) =>
+        item.id === updatedRecord.id ? mappedRow : item
+      );
     }
 
-    setPaymentHistory((current) =>
-      current.map((item) => (item.id === historyInlineEditId ? updatedRecord : item))
-    );
-    toast.success("ریکارڈ اپڈیٹ ہو گیا۔");
-    cancelInlineHistoryEdit();
+    setPaymentHistory(updatedHistory);
+    setIsSavingPayment(false);
+    toast.success("ادائیگی کامیابی سے اپڈیٹ ہو گئی۔");
+    setEditingPaymentModalRecord(null);
+
+    const savedRecord = updatedHistory.find((item) => item.id === updatedRecord.id);
+    if (savedRecord && isPrintPromptEnabled) {
+      setPrintConfirmRecord(savedRecord);
+    }
   };
 
   const handleDeleteFromHistory = async (recordId) => {
@@ -2124,8 +2372,8 @@ export default function App() {
     }
 
     setPaymentHistory((current) => current.filter((item) => item.id !== recordId));
-    if (historyInlineEditId === recordId) {
-      cancelInlineHistoryEdit();
+    if (editingPaymentModalRecord?.id === recordId) {
+      setEditingPaymentModalRecord(null);
     }
     if (editingPaymentId === recordId) {
       handleReset();
@@ -3026,240 +3274,72 @@ export default function App() {
                 </thead>
                 <tbody>
                   {filteredPaymentHistory.map((record, index) => {
-                    const isInlineEditing = historyInlineEditId === record.id;
-                    const inlineItems = isInlineEditing ? historyInlineDraft?.feeItems || [] : [];
-                    const inlineTotalAmount = isInlineEditing
-                      ? inlineItems.reduce((sum, item) => sum + toWholeNumber(item.amount), 0)
-                      : record.totalAmount;
                     const itemsText = (record.feeItems || []).length
                       ? record.feeItems
                         .map((item) => `${item.item || "Unnamed"} (${toWholeNumber(item.amount)})`)
                         .join(", ")
                       : "کوئی آئٹم نہیں";
-                    const inlineReceived = isInlineEditing
-                      ? toWholeNumber(historyInlineDraft?.amountReceived)
-                      : record.amountReceived;
-                    const inlineRemaining = Math.max(toWholeNumber(inlineTotalAmount) - inlineReceived, 0);
 
                     return (
-                      <Fragment key={record.id}>
-                        <tr>
-                          <td className="history-sno-cell">{index + 1}</td>
-                          <td>
-                            {isInlineEditing ? (
-                              <input
-                                className="history-inline-input"
-                                type="text"
-                                value={historyInlineDraft?.invoiceNo || ""}
-                                onChange={(event) =>
-                                  handleInlineHistoryDraftChange("invoiceNo", event.target.value)
-                                }
-                              />
-                            ) : (
-                              record.invoiceNo || "-"
-                            )}
-                          </td>
-                          <td>
-                            {isInlineEditing ? (
-                              <DateInput
-                                className="history-inline-input"
-                                value={historyInlineDraft?.date || getTodayDate()}
-                                onChange={(value) => handleInlineHistoryDraftChange("date", value)}
-                              />
-                            ) : (
-                              <bdi dir="ltr">{formatDateDDMMYYYY(record.date)}</bdi>
-                            )}
-                          </td>
-                          <td>
-                            {isInlineEditing ? (
-                              <input
-                                className="history-inline-input"
-                                type="text"
-                                lang="ur"
-                                dir="rtl"
-                                value={historyInlineDraft?.studentName || ""}
-                                onChange={(event) =>
-                                  handleInlineHistoryUrduDraftChange("studentName", event.target.value)
-                                }
-                              />
-                            ) : (
-                              record.studentName || "-"
-                            )}
-                          </td>
-                          <td>
-                            {isInlineEditing ? (
-                              <input
-                                className="history-inline-input"
-                                type="text"
-                                lang="ur"
-                                dir="rtl"
-                                value={historyInlineDraft?.fatherName || ""}
-                                onChange={(event) =>
-                                  handleInlineHistoryUrduDraftChange("fatherName", event.target.value)
-                                }
-                              />
-                            ) : (
-                              record.fatherName || "-"
-                            )}
-                          </td>
-                          <td>
-                            {isInlineEditing ? (
-                              <input
-                                className="history-inline-input"
-                                type="text"
-                                value={historyInlineDraft?.className || ""}
-                                onChange={(event) =>
-                                  handleInlineHistoryDraftChange("className", event.target.value)
-                                }
-                              />
-                            ) : (
-                              record.className || "-"
-                            )}
-                          </td>
-                          <td className="history-items-cell">
-                            {itemsText}
-                          </td>
-                          <td>{isInlineEditing ? inlineTotalAmount : record.totalAmount}</td>
-                          <td>
-                            {isInlineEditing ? (
-                              <input
-                                className="history-inline-input"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={historyInlineDraft?.amountReceived || ""}
-                                onChange={(event) =>
-                                  handleInlineHistoryDraftChange("amountReceived", event.target.value)
-                                }
-                              />
-                            ) : (
-                              record.amountReceived
-                            )}
-                          </td>
-                          <td>{isInlineEditing ? inlineRemaining : record.remainingAmount}</td>
-                          <td className="history-actions-cell">
-                            <div className="history-actions-wrap">
-                              {isInlineEditing ? (
-                                <div className="history-inline-actions">
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary history-action-icon-btn"
-                                    onClick={saveInlineHistoryEdit}
-                                    title="Save"
-                                    aria-label="Save"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M20 6 9 17l-5-5" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost history-action-icon-btn"
-                                    onClick={cancelInlineHistoryEdit}
-                                    title="Cancel"
-                                    aria-label="Cancel"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M18 6 6 18M6 6l12 12" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="history-row-actions">
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost history-action-icon-btn"
-                                    onClick={() => handlePrintFromHistoryContext(record.id)}
-                                    title="Print"
-                                    aria-label="Print"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M6 9V2h12v7" />
-                                      <rect x="6" y="14" width="12" height="8" rx="1" />
-                                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v5a2 2 0 0 1-2 2h-2" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost history-action-icon-btn"
-                                    onClick={() => startInlineEdit(record)}
-                                    title="Edit"
-                                    aria-label="Edit"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M12 20h9" />
-                                      <path d="m16.5 3.5 4 4L8 20l-5 1 1-5Z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost history-action-icon-btn history-action-delete"
-                                    onClick={() => handleDeleteFromHistory(record.id)}
-                                    title="Delete"
-                                    aria-label="Delete"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M3 6h18" />
-                                      <path d="M8 6V4h8v2" />
-                                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                      <path d="M10 11v6M14 11v6" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )}
+                      <tr key={record.id}>
+                        <td className="history-sno-cell">{index + 1}</td>
+                        <td>{record.invoiceNo || "-"}</td>
+                        <td>
+                          <bdi dir="ltr">{formatDateDDMMYYYY(record.date)}</bdi>
+                        </td>
+                        <td>{record.studentName || "-"}</td>
+                        <td>{record.fatherName || "-"}</td>
+                        <td>{record.className || "-"}</td>
+                        <td className="history-items-cell">{itemsText}</td>
+                        <td>{formatAmount(record.totalAmount)}</td>
+                        <td>{formatAmount(record.amountReceived)}</td>
+                        <td>{formatAmount(record.remainingAmount)}</td>
+                        <td className="history-actions-cell">
+                          <div className="history-actions-wrap">
+                            <div className="history-row-actions">
+                              <button
+                                type="button"
+                                className="btn btn-ghost history-action-icon-btn"
+                                onClick={() => handlePrintFromHistoryContext(record.id)}
+                                title="Print"
+                                aria-label="Print"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 9V2h12v7" />
+                                  <rect x="6" y="14" width="12" height="8" rx="1" />
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v5a2 2 0 0 1-2 2h-2" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost history-action-icon-btn"
+                                onClick={() => handleStartEditPayment(record)}
+                                title="Edit"
+                                aria-label="Edit"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M12 20h9" />
+                                  <path d="m16.5 3.5 4 4L8 20l-5 1 1-5Z" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost history-action-icon-btn history-action-delete"
+                                onClick={() => handleDeleteFromHistory(record.id)}
+                                title="Delete"
+                                aria-label="Delete"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                  <path d="M10 11v6M14 11v6" />
+                                </svg>
+                              </button>
                             </div>
-                          </td>
-                        </tr>
-                        {isInlineEditing && (
-                          <tr className="history-detail-row history-inline-items-row">
-                            <td colSpan={10}>
-                              <div className="history-inline-items-editor">
-                                <div className="history-inline-items-list">
-                                  {inlineItems.map((item, index) => (
-                                    <div className="history-inline-item-row" key={item.id}>
-                                      <span className="history-inline-item-index">{index + 1}</span>
-                                      <input
-                                        className="history-inline-input history-inline-item-name"
-                                        type="text"
-                                        lang="ur"
-                                        dir="rtl"
-                                        value={item.item}
-                                        placeholder="آئٹم کا نام"
-                                        onChange={(event) =>
-                                          handleInlineHistoryItemChange(item.id, "item", event.target.value)
-                                        }
-                                      />
-                                      <input
-                                        className="history-inline-input history-inline-item-amount"
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={item.amount}
-                                        placeholder="0"
-                                        onChange={(event) =>
-                                          handleInlineHistoryItemChange(item.id, "amount", event.target.value)
-                                        }
-                                      />
-                                      <button
-                                        type="button"
-                                        className="btn btn-danger"
-                                        onClick={() => removeInlineHistoryItem(item.id)}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="history-inline-items-tools">
-                                  <button type="button" className="btn btn-secondary" onClick={addInlineHistoryItem}>
-                                    + آئٹم شامل کریں
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -3778,29 +3858,37 @@ export default function App() {
         </section>
       )}
 
-      {(activePage === "collect-fee" || activePage === "expenditure") && (
-        <div className="toast-stack" aria-live="polite" aria-atomic="true">
-          {toasts.map((item) => (
-            <div
-              className={`toast toast-${item.type} ${item.isClosing ? "is-closing" : ""}`}
-              style={{ "--toast-duration": `${item.duration || 3200}ms` }}
-              key={item.id}
+      <div className="toast-stack" aria-live="polite" aria-atomic="true">
+        {toasts.map((item) => (
+          <div
+            className={`toast toast-${item.type} ${item.isClosing ? "is-closing" : ""}`}
+            style={{ "--toast-duration": `${item.duration || 3200}ms` }}
+            key={item.id}
+          >
+            <span className="toast-message" dir={getMessageDirection(item.message)}>
+              {item.message}
+            </span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => toast.dismiss(item.id)}
+              aria-label="پیغام بند کریں"
             >
-              <span className="toast-message" dir={getMessageDirection(item.message)}>
-                {item.message}
-              </span>
-              <button
-                type="button"
-                className="toast-close"
-                onClick={() => toast.dismiss(item.id)}
-                aria-label="پیغام بند کریں"
-              >
-                ×
-              </button>
-              <div className="toast-progress" aria-hidden="true" />
-            </div>
-          ))}
-        </div>
+              ×
+            </button>
+            <div className="toast-progress" aria-hidden="true" />
+          </div>
+        ))}
+      </div>
+
+      {editingPaymentModalRecord && (
+        <PaymentEditModal
+          record={editingPaymentModalRecord}
+          onClose={handleCloseEditPaymentModal}
+          onSave={handleSaveEditedPayment}
+          isSaving={isSavingPayment}
+          toast={toast}
+        />
       )}
 
       {printConfirmRecord && (
